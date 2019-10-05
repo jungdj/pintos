@@ -242,14 +242,16 @@ thread_wake (void)
 {
     int64_t ticks = timer_ticks ();
     struct list_elem *e = list_begin (&sleep_list);
-    if (e == list_end (&sleep_list)) {
-        return;
-    }
-
-    struct thread *t = list_entry (e, struct thread, elem);
-    if (ticks > t->awake_from) {
-        list_pop_front (&sleep_list);
-        thread_unblock (t);
+    
+    while (e != list_end (&sleep_list)) {
+        struct thread *t = list_entry (e, struct thread, elem);
+        if (ticks >= t->awake_from) {
+            e = e->next;
+            list_pop_front (&sleep_list);
+            thread_unblock (t);
+        } else {
+            break;
+        }
     }
 }
 
