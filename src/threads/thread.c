@@ -208,9 +208,9 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
   
   /* if prioiriy of current thread is small than new thread */
-  // if (thread_current() -> priority < priority){
-  //   thread_yield();
-  // }
+  if (thread_current() -> priority < priority){
+    thread_yield();
+  }
 
   return tid;
 }
@@ -358,7 +358,6 @@ priority_smaller (const struct list_elem *a, const struct list_elem *b, void *au
 void
 awakes_threads(int64_t ticks){
   enum intr_level old_level = intr_disable ();
-  struct list_elem *e;
   while(!list_empty(&sleep_list)){
     struct list_elem * e = list_min (&sleep_list, awake_faster, NULL);
     struct thread *t = list_entry (e, struct thread, sleepelem);
@@ -556,7 +555,6 @@ next_thread_to_run (void)
   else{
     struct thread* next_thread = list_entry(list_max(&ready_list, priority_smaller, NULL), struct thread, elem);
     list_remove (list_max(&ready_list, priority_smaller, NULL));
-    // return list_entry(list_pop_front(&ready_list), struct thread, elem);
     return next_thread;
   }
 }
