@@ -206,7 +206,8 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  update_running_thread(t);
+  check_ready_thread();
+
   return tid;
 }
 
@@ -297,6 +298,7 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
+  thread_current ()->virtual_priority = thread_current()->priority;
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -346,7 +348,7 @@ priority_smaller (const struct list_elem *a, const struct list_elem *b, void *au
 {
   struct thread *at = list_entry (a, struct thread, elem);
   struct thread *bt = list_entry (b, struct thread, elem);
-  return (at->priority<bt->priority);
+  return (at->virtual_priority<bt->virtual_priority);
 }
 
 /* Awake all threads which are time to awake in sleep_list */
@@ -384,17 +386,23 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+/* real값을 변경하고, 비교해서 virtual과  업데이트 */
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
-  struct list_elem * e;
-  for(e = list_begin (&ready_list); e != list_end(&ready_list); e = list_next (e)){
-    struct thread *t = list_entry (e, struct thread, elem);
-    if(new_priority<t->priority){
-      thread_yield();
-      break;
-    }
+  struct thread * t = thread_current();
+  bool is_same = (t->virtual_priority == t->priority ? true : false);
+  t->priority = new_priority;
+  if (t->priority>t->virtual_priority || is_same){
+    thread_set_virtual_priority(t, new_priority, is_same);
+  }
+}
+
+void 
+thread_set_virtual_priority (struct thread *t, int new_priority, bool is_same){
+  if (t->virtual_priority<new_priority || is_same){
+    t->virtual_priority = new_priority;
+    check_ready_thread();
   }
 }
 
@@ -402,7 +410,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  return thread_current ()->virtual_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -522,6 +530,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->virtual_priority = priority;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
@@ -650,9 +659,16 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* Change running thread when a new element is added to the list   */
-void
-update_running_thread(struct thread * t){
-  if (thread_current()!= idle_thread && thread_current()->priority<t->priority){
+// void
+// update_running_thread(struct thread * t){
+//   if (thread_current()!= idle_thread && thread_current()->priority<t->priority){
+//     thread_yield();
+//   }
+// }
+void 
+check_ready_thread(void){
+  struct thread* max_thread = list_entry(list_max(&ready_list, priority_smaller, NULL), struct thread, elem);
+  if (max_thread->virtual_priority>thread_current()->virtual_priority){
     thread_yield();
   }
 }

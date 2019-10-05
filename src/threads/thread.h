@@ -141,6 +141,7 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_set_virtual_priority (struct thread *t, int new_priority, bool is_same);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
@@ -148,6 +149,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-void update_running_thread(struct thread * t);
+// void update_running_thread(struct thread * t);
+void check_ready_thread(void);
 
 #endif /* threads/thread.h */
