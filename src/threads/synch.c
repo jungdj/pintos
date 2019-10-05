@@ -101,6 +101,15 @@ sema_try_down (struct semaphore *sema)
   return success;
 }
 
+static bool
+e_priority_less (const struct list_elem *a_, const struct list_elem *b_,
+                 void *aux UNUSED)
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  return a->effective_priority > b->effective_priority;
+}
+
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -113,10 +122,11 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
   sema->value++;
+  if (!list_empty (&sema->waiters)) {
+    list_sort (&sema->waiters, e_priority_less, NULL);
+    thread_unblock (list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+  }
   intr_set_level (old_level);
 }
 
@@ -192,12 +202,25 @@ lock_init (struct lock *lock)
 void
 lock_acquire (struct lock *lock)
 {
+  enum intr_level old_level;
+  old_level = intr_disable ();
+
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
-  sema_down (&lock->semaphore);
+  int cur_priority = thread_get_priority ();
+
+  if (!sema_try_down (&lock->semaphore)) {
+    if (lock->holder != NULL) {
+      if (lock->holder->effective_priority < cur_priority) {
+        lock->holder->effective_priority = cur_priority;
+      }
+    }
+    sema_down (&lock->semaphore);
+  }
   lock->holder = thread_current ();
+  intr_set_level (old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -228,11 +251,14 @@ lock_try_acquire (struct lock *lock)
 void
 lock_release (struct lock *lock) 
 {
+//  printf ("Release %s\n", thread_current ()->name);
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  lock->holder->effective_priority = lock->holder->priority;
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+  thread_yield ();
 }
 
 /* Returns true if the current thread holds LOCK, false

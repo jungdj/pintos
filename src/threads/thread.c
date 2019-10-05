@@ -225,12 +225,12 @@ sleep_less (const struct list_elem *a_, const struct list_elem *b_,
 }
 
 static bool
-priority_less (const struct list_elem *a_, const struct list_elem *b_,
-                void *aux UNUSED)
+e_priority_less (const struct list_elem *a_, const struct list_elem *b_,
+                 void *aux UNUSED)
 {
     const struct thread *a = list_entry (a_, struct thread, elem);
     const struct thread *b = list_entry (b_, struct thread, elem);
-    return a->priority > b->priority;
+    return a->effective_priority > b->effective_priority;
 }
 
 void
@@ -301,7 +301,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, priority_less, NULL);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -372,7 +372,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-      list_insert_ordered (&ready_list, &cur->elem, priority_less, NULL);
+      list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -399,10 +399,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  int cur_priority = thread_current()->priority;
-  thread_current()->priority = new_priority;
+  int cur_priority = thread_current ()->priority;
+  thread_current ()->priority = new_priority;
+  thread_current ()->effective_priority = new_priority;
   if (cur_priority > new_priority) {
-    thread_yield();
+    thread_yield ();
   }
 }
 
@@ -410,7 +411,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  return thread_current ()->effective_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -530,6 +531,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->effective_priority = priority;
   t->awake_from = 0;
   t->magic = THREAD_MAGIC;
 
@@ -562,6 +564,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
+    list_sort (&ready_list, e_priority_less, NULL);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
