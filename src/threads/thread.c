@@ -75,6 +75,7 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+void update_running_thread(struct thread * t);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -205,12 +206,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
-  
-  /* if prioiriy of current thread is small than new thread */
-  if (thread_current() -> priority < priority){
-    thread_yield();
-  }
-
+  update_running_thread(t);
   return tid;
 }
 
@@ -392,15 +388,8 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
-  /*
-  1. waiter들이 있다면 waiter중에 가장 큰 것으로 다시 바꾼다.
-  2. waiter들이 없다면,
-    가장 낮은게 아니라면 thread_yield한다.
-  */
-  /* running중에 본인이 가장 큰게 아니라면 밀어버린다.
-  */
   struct list_elem * e;
-  for(e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e)){
+  for(e = list_begin (&ready_list); e != list_end(&ready_list); e = list_next (e)){
     struct thread *t = list_entry (e, struct thread, elem);
     if(new_priority<t->priority){
       thread_yield();
@@ -659,3 +648,11 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+/* Change running thread when a new element is added to the list   */
+void
+update_running_thread(struct thread * t){
+  if (thread_current()!= idle_thread && thread_current()->priority<t->priority){
+    thread_yield();
+  }
+}
