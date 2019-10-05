@@ -28,6 +28,10 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of sleep processes. Processes are added to this list
+   when they are first sleepd and removed when they awake. */
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -64,6 +68,8 @@ static void kernel_thread (thread_func *, void *aux);
 static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
+bool awake_faster (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
@@ -92,7 +98,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  list_init (&sleep_list);
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -200,6 +206,11 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
+  /* if prioiriy of current thread is small than new thread */
+  // if (thread_current() -> priority < priority){
+  //   thread_yield();
+  // }
 
   return tid;
 }
@@ -311,6 +322,53 @@ thread_yield (void)
     list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
+  intr_set_level (old_level);
+}
+
+/* when timer_sleep is called in timer.c, block the current thread,
+    put the thread in sleep_list and block current thread. */
+void 
+thread_sleep (int64_t alarm){
+  enum intr_level old_level = intr_disable ();
+  struct thread * t = thread_current();
+  t->alarm = alarm;
+  list_push_back (&sleep_list, &t->sleepelem);
+  thread_block();
+  intr_set_level (old_level);
+}
+
+/* Compare two elem in sleepelem. True whan *a is should awake earlier than *b, else False */
+bool 
+awake_faster (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *at = list_entry (a, struct thread, sleepelem);
+  struct thread *bt = list_entry (b, struct thread, sleepelem);
+  return (at->alarm<bt->alarm);
+}
+
+bool 
+priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *at = list_entry (a, struct thread, elem);
+  struct thread *bt = list_entry (b, struct thread, elem);
+  return (at->priority<bt->priority);
+}
+
+/* Awake all threads which are time to awake in sleep_list */
+void
+awakes_threads(int64_t ticks){
+  enum intr_level old_level = intr_disable ();
+  struct list_elem *e;
+  while(!list_empty(&sleep_list)){
+    struct list_elem * e = list_min (&sleep_list, awake_faster, NULL);
+    struct thread *t = list_entry (e, struct thread, sleepelem);
+    if (t->alarm <= ticks){
+      thread_unblock(t);
+      list_remove(e);
+    }else{
+      break;
+    }
+  }
   intr_set_level (old_level);
 }
 
@@ -487,13 +545,20 @@ alloc_frame (struct thread *t, size_t size)
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
+
+/* Modified : Return thread that has smallest priority in elem(ready queue)
+*/
 static struct thread *
 next_thread_to_run (void) 
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else{
+    struct thread* next_thread = list_entry(list_max(&ready_list, priority_smaller, NULL), struct thread, elem);
+    list_remove (list_max(&ready_list, priority_smaller, NULL));
+    // return list_entry(list_pop_front(&ready_list), struct thread, elem);
+    return next_thread;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
