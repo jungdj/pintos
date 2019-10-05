@@ -69,7 +69,6 @@ static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 bool awake_faster (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-bool priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
@@ -393,6 +392,21 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  /*
+  1. waiter들이 있다면 waiter중에 가장 큰 것으로 다시 바꾼다.
+  2. waiter들이 없다면,
+    가장 낮은게 아니라면 thread_yield한다.
+  */
+  /* running중에 본인이 가장 큰게 아니라면 밀어버린다.
+  */
+  struct list_elem * e;
+  for(e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e)){
+    struct thread *t = list_entry (e, struct thread, elem);
+    if(new_priority<t->priority){
+      thread_yield();
+      break;
+    }
+  }
 }
 
 /* Returns the current thread's priority. */

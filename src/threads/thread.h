@@ -88,9 +88,10 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int virtual_priority;               /* Virtual priority for donation */
     struct list_elem allelem;           /* List element for all threads list. */
     struct list_elem sleepelem;         
-    
+
     int64_t alarm; /*will wake up*/
     /*struct list_elem sleepelem;          List element for all sleep thread list.*/
 
@@ -145,5 +146,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
+bool priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 #endif /* threads/thread.h */
