@@ -1,3 +1,4 @@
+#include "devices/timer.h"
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -23,6 +24,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list sleep_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -91,6 +94,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -133,10 +137,12 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+  if (++thread_ticks >= TIME_SLICE) {
+      intr_yield_on_return();
+  }
+
+  thread_wake ();
 }
 
 /* Prints thread statistics. */
@@ -202,6 +208,49 @@ thread_create (const char *name, int priority,
   thread_unblock (t);
 
   return tid;
+}
+
+static bool
+sleep_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
+{
+    const struct thread *a = list_entry (a_, struct thread, elem);
+    const struct thread *b = list_entry (b_, struct thread, elem);
+
+    return a->awake_from < b->awake_from;
+}
+
+void
+thread_sleep (int64_t ticks)
+{
+    enum intr_level old_level;
+    old_level = intr_disable ();
+
+    struct thread *cur = thread_current ();
+    ASSERT(cur != idle_thread);
+
+    cur->awake_from = ticks;
+
+    list_insert_ordered (&sleep_list, &cur->elem, sleep_less, NULL);
+    thread_block();
+
+    intr_set_level (old_level);
+}
+
+void
+thread_wake (void)
+{
+    int64_t ticks = timer_ticks ();
+    struct list_elem *e = list_begin (&sleep_list);
+    if (e == list_end (&sleep_list)) {
+        return;
+    }
+
+    struct thread *t = list_entry (e, struct thread, elem);
+    if (ticks > t->awake_from) {
+        list_pop_front (&sleep_list);
+        thread_unblock (t);
+    }
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -462,6 +511,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->awake_from = 0;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
