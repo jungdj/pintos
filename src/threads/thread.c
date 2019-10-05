@@ -75,7 +75,6 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
-void update_running_thread(struct thread * t);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -659,12 +658,6 @@ allocate_tid (void)
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 /* Change running thread when a new element is added to the list   */
-// void
-// update_running_thread(struct thread * t){
-//   if (thread_current()!= idle_thread && thread_current()->priority<t->priority){
-//     thread_yield();
-//   }
-// }
 void 
 check_ready_thread(void){
   struct thread* max_thread = list_entry(list_max(&ready_list, priority_smaller, NULL), struct thread, elem);

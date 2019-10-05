@@ -149,7 +149,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool priority_smaller (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-// void update_running_thread(struct thread * t);
 void check_ready_thread(void);
 
 #endif /* threads/thread.h */
