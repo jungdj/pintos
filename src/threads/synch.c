@@ -227,9 +227,21 @@ lock_acquire (struct lock *lock)
         /* nested 구현
          *
          * */
+        struct thread *parent = lock->holder;
+        while (parent->lock_needed != NULL) {
+          parent = parent->lock_needed->holder;
+
+          if (parent->effective_priority < cur_priority) {
+            parent->effective_priority = cur_priority;
+          } else {
+            break;
+          }
+        }
       }
     }
+    thread_current ()->lock_needed = lock;
     sema_down (&lock->semaphore);
+    thread_current ()->lock_needed = NULL;
   }
   lock->holder = thread_current ();
   list_push_back (&lock->holder->locks, &lock->elem);

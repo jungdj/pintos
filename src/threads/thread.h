@@ -90,6 +90,7 @@ struct thread
     int priority;                       /* Priority. */
     int effective_priority;             /* Effective Priority . */
     struct list locks;                  /* List of locks */
+    struct lock *lock_needed;            /* Lock failed to acquire */
     int64_t awake_from;                 /* Awake from . */
     struct list_elem allelem;           /* List element for all threads list. */
 

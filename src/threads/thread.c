@@ -556,6 +556,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->effective_priority = priority;
   t->awake_from = 0;
   t->magic = THREAD_MAGIC;
+  t->lock_needed = NULL;
   list_init (&t->locks);
 
   old_level = intr_disable ();
