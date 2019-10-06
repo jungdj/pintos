@@ -229,6 +229,7 @@ lock_acquire (struct lock *lock)
          * */
         struct thread *parent = lock->holder;
         while (parent->lock_needed != NULL) {
+          (&parent->lock_needed->semaphore)->max_priority = cur_priority;
           parent = parent->lock_needed->holder;
 
           if (parent->effective_priority < cur_priority) {
@@ -244,7 +245,7 @@ lock_acquire (struct lock *lock)
     thread_current ()->lock_needed = NULL;
   }
   lock->holder = thread_current ();
-  list_push_back (&lock->holder->locks, &lock->elem);
+  list_push_back (&thread_current ()->locks, &lock->elem);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
