@@ -399,13 +399,33 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  int cur_priority = thread_current ()->priority;
-  thread_current ()->priority = new_priority;
-  thread_current ()->effective_priority = new_priority;
-  // 락이 있으면 낮추면 안됨
-  // 락이 없으면 무조건 변경
-  if (cur_priority < new_priority) {
+  struct thread *cur = thread_current ();
+  struct list *locks = &cur->locks;
+
+  int prev_priority = cur->priority;
+  cur->priority = new_priority;
+
+  // 락이 있으면 lock list의 semaphore max priority로
+  if (!list_empty (&cur->locks)) {
+    //* 될 것 같지만 느낌만
+    int max_priority = new_priority;
+    struct list_elem *e;
+    for (e = list_begin (locks); e != list_end (locks); e=e->next) {
+      struct lock *lock = list_entry (e, struct lock, elem);
+      struct semaphore *sema = &lock->semaphore;
+      if (max_priority < sema->max_priority) max_priority = sema->max_priority;
+    }
+    cur->effective_priority = max_priority;
+
+    // 끝나고 yield
     thread_yield ();
+  } else {
+    // 락이 없으면 무조건 변경
+    cur->effective_priority = new_priority;
+    // Priority 가 낮아지면 yield
+    if (prev_priority > new_priority) {
+      thread_yield ();
+    }
   }
 }
 
@@ -536,6 +556,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->effective_priority = priority;
   t->awake_from = 0;
   t->magic = THREAD_MAGIC;
+  list_init (&t->locks);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

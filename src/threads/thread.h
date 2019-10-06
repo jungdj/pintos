@@ -89,6 +89,7 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int effective_priority;             /* Effective Priority . */
+    struct list locks;                  /* List of locks */
     int64_t awake_from;                 /* Awake from . */
     struct list_elem allelem;           /* List element for all threads list. */
 
