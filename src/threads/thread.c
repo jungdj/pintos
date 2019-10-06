@@ -399,15 +399,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  int prev_priority = thread_current ()->priority;
+  thread_current ()->priority = new_priority;
+
   struct thread *cur = thread_current ();
   struct list *locks = &cur->locks;
 
-  int prev_priority = cur->priority;
-  cur->priority = new_priority;
-
   // 락이 있으면 lock list의 semaphore max priority로
   if (!list_empty (&cur->locks)) {
-    //* 될 것 같지만 느낌만
     int max_priority = new_priority;
     struct list_elem *e;
     for (e = list_begin (locks); e != list_end (locks); e=e->next) {
