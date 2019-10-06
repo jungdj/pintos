@@ -402,7 +402,9 @@ thread_set_priority (int new_priority)
   int cur_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
   thread_current ()->effective_priority = new_priority;
-  if (cur_priority > new_priority) {
+  // 락이 있으면 낮추면 안됨
+  // 락이 없으면 무조건 변경
+  if (cur_priority < new_priority) {
     thread_yield ();
   }
 }
