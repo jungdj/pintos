@@ -5,3 +5,6 @@ tags
 
 .idea
 .vscode
+
+examples/**/*.o
+libc.a
