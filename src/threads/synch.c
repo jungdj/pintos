@@ -134,11 +134,12 @@ sema_up (struct semaphore *sema)
     /* Sema's max_priority is updated to the priority of next
        waiter with highest priority */
     sema->max_priority = list_entry (list_begin (&sema->waiters), struct thread, elem)->effective_priority;
+    thread_yield ();
   } else {
     /* No waiters left for the sema */
     sema->max_priority = 0;
   }
-  thread_yield ();
+
   intr_set_level (old_level);
 }
 
@@ -288,12 +289,13 @@ lock_release (struct lock *lock)
   /* Holder's new priority will be original priority if there're
      no other locks left */
   struct list *locks = &lock->holder->locks;
+
   int new_priority = lock->holder->priority;
 
   /* Otherwise (other locks left), holder's new priority is the
    * highest priority among all locks' semaphore's max_priority */
   struct list_elem *e;
-  for (e = list_begin (locks); e != list_end (locks); e=e->next) {
+  for (e = list_begin (locks); e != list_end (locks); e = e->next) {
     struct lock *lock = list_entry (e, struct lock, elem);
     struct semaphore *sema = &lock->semaphore;
     if (new_priority < sema->max_priority) new_priority = sema->max_priority;
