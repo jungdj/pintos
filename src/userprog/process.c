@@ -111,9 +111,10 @@ int
 process_wait (tid_t child_tid UNUSED) 
 {
   int i;
-  for (i = 10000000000; i > 0; i--) {}
+  for (i = 1000000; i > 0; i--) {}
   return -1;
 }
+
 
 /* Free the current process's resources. */
 void
