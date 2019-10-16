@@ -17,7 +17,6 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
-#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *args, void (**eip) (void), void **esp);
@@ -42,27 +41,27 @@ parse_args (char *s)
 tid_t
 process_execute (const char *args)
 {
-  char *args_copy;
+  char *args_copy, *args_copy2;
   tid_t tid;
-
-  printf("\nProcess execute : %s\n", args);
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
   args_copy = palloc_get_page (0);
+  args_copy2 = palloc_get_page (0);
+
   if (args_copy == NULL)
     return TID_ERROR;
   strlcpy (args_copy, args, PGSIZE);
+  strlcpy (args_copy2, args, PGSIZE);
 
-//  printf("%s\n", args_copy);
-//  file_name = pure_parse_name (args_copy);
-//  printf("File name : %s\n", file_name);
+  parse_args (args_copy2);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (args_copy, PRI_DEFAULT, start_process, args_copy);
-  printf("End of execute\n");
-  if (tid == TID_ERROR)
+  tid = thread_create (argv[0], PRI_DEFAULT, start_process, args_copy);
+  if (tid == TID_ERROR) {
     palloc_free_page (args_copy);
+    palloc_free_page (args_copy2);
+  }
   return tid;
 }
 
@@ -71,7 +70,6 @@ process_execute (const char *args)
 static void
 start_process (void *args_)
 {
-  printf("Start process\n");
   char *args = args_;
   struct intr_frame if_;
   bool success;
@@ -110,8 +108,7 @@ start_process (void *args_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  int i;
-  for (i = 1000000; i > 0; i--) {}
+  for (int i=500000000; i>0; i--) {}
   return -1;
 }
 
@@ -233,15 +230,12 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *args, void (**eip) (void), void **esp)
 {
-  printf("Load \n");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
   off_t file_ofs;
   bool success = false;
   int i;
-
-  parse_args (args);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -456,8 +450,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp)
 {
-  printf("Setup stack\n");
   uint8_t *kpage;
+  uint32_t argv_point;
   bool success = false;
   int i;
   uint32_t word_align;
@@ -470,38 +464,28 @@ setup_stack (void **esp)
       {
         *esp = PHYS_BASE;
         for (i = argc; i > 0; i--) {
-          *esp -= (strlen(argv[i-1]) + 1);
-          memcpy(*esp, argv[i-1], strlen(argv[i-1]) + 1);
+          *esp -= (strlen (argv [i-1]) + 1);
+          memcpy (*esp, argv[i-1], strlen(argv[i-1]) + 1);
           argv[i-1] = (char *) *esp;
-//          printf("%x %s\n", (uint32_t) *esp, (char *) *esp);
-//          printf("%x %s\n", (uint32_t) argv[i-1], argv[i-1]);
         }
-//        hex_dump((uintptr_t *) *esp, *esp, 0xc0000000 - (uint32_t) *esp, true);
         word_align = (uint32_t) *esp % 4;
-        printf("WA %d\n", word_align);
-        *esp -= word_align;
-        memset(*esp, 0, word_align);
-        printf("After align %x\n", *esp);
+        *esp -= (word_align + 4);
+        memset (*esp, 0, word_align + 4);
 
         for (i = argc; i > 0; i--) {
           *esp -= sizeof (char *);
           memcpy (*esp, argv + i - 1, sizeof (char *));
-          printf ("%x %x %s\n", *(argv + i - 1), (uint32_t) *esp, (char *) *((char **) *esp));
         }
-//        *esp -= sizeof(argv);
-//        memcpy(*esp, argv, sizeof(argv) + 1);
+        argv_point = (uint32_t) *esp;
         *esp -= sizeof (char **);
-        printf("Size of char ** %d\n", sizeof (char **));
-        memcpy(*esp, argv, sizeof (char **));
+        memcpy(*esp, &argv_point, 4);
 
         *esp -= sizeof (int);
         memcpy(*esp, &argc, sizeof (int));
 
         *esp -= sizeof (void *);
         memset(*esp, 0, sizeof (void *));
-//        printf("%x %x %x\n", 0xc0000000, (uint8_t) *esp, 0xc0000000 - (uint32_t) *esp);
-//        printf("%x\n", *esp);
-        hex_dump((uintptr_t *) *esp, *esp, 0xc0000000 - (uint32_t) *esp, true);
+//        hex_dump((uintptr_t *) *esp, *esp, 0xc0000000 - (uint32_t) *esp, true);
       }
       else
         palloc_free_page (kpage);
