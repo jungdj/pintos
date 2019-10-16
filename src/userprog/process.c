@@ -108,7 +108,7 @@ start_process (void *args_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  for (int i=500000000; i>0; i--) {}
+  for (int i=50000000; i>0; i--) {}
   return -1;
 }
 

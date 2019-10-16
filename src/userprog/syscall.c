@@ -2,13 +2,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <syscall-nr.h>
+#include <devices/shutdown.h>
+#include <filesys/filesys.h>
+#include <filesys/file.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "pagedir.h"
 
 static void syscall_handler (struct intr_frame *);
+static void halt ();
 static void exit (int status);
+static int exec (const char *file);
+static int wait (int pid);
+static bool create (const char *filename, unsigned initial_size);
+static bool remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, void *buffer, unsigned length);
 static int write (int fd, const void *buffer, unsigned size);
+static void seek (int fd, unsigned position);
+static unsigned tell (int fd);
+static void close (int fd);
 
 void
 syscall_init (void) 
@@ -16,38 +31,28 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-/* Reads a byte at user virtual address UADDR.
-   UADDR must be below PHYS_BASE.
-   Returns the byte value if successful, -1 if a segfault
-   occurred. */
-static int
-get_user (const uint8_t *uaddr)
-{
-  int result;
-  asm ("movl $1f, %0; movzbl %1, %0; 1:"
-  : "=&a" (result) : "m" (*uaddr));
-  return result;
-}
-
-/* Writes BYTE to user address UDST.
-   UDST must be below PHYS_BASE.
-   Returns true if successful, false if a segfault occurred. */
-static bool
-put_user (uint8_t *udst, uint8_t byte)
-{
-  int error_code;
-  asm ("movl $1f, %0; movb %b2, %1; 1:"
-  : "=&a" (error_code), "=m" (*udst) : "q" (byte));
-  return error_code != -1;
-}
-
-
 static void *
 esp_pop (void **esp)
 {
   void* val = *esp;
   return val;
 }
+
+static void
+privilege_check (void *uaddr)
+{
+  if (uaddr == NULL || !is_user_vaddr(uaddr))
+  {
+    exit(-1);
+  }
+  /* Check given pointer is mapped or unmapped */
+  uint32_t *pd = thread_current()->pagedir;
+  if (pagedir_get_page (pd, uaddr) == NULL)
+  {
+    exit (-1);
+  }
+}
+
 
 static void *
 read_argument (void **esp, void **args, uint8_t num)
@@ -57,32 +62,45 @@ read_argument (void **esp, void **args, uint8_t num)
 
   for (i = 0; i < num; i++) {
     args[i] = tmp;
-    memcpy (args[i], tmp, 4);
-    if (!(
-      args[i] != NULL &&
-      args[i] < PHYS_BASE
-    )) {
-      exit (-1);
-    }
     tmp += 4;
   }
 }
 
+/* return file that match fd.
+ * if there are no matched file, return NULL
+ * */
+static struct file *
+find_file (int fd)
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct file_descriptor *fd_info;
+  struct file *file = NULL;
+
+  for (e = list_begin (&t->fds); e != list_end (&t->fds); e = e->next)
+  {
+    fd_info = list_entry (e, struct file_descriptor, elem);
+    if (fd_info->fd == fd) {
+      file = fd_info->file;
+      return file;
+    }
+  }
+
+  return NULL;
+}
+
 static void
 syscall_handler(struct intr_frame *f) {
-  //printf("system call!\n");
   void *args[3];
   int syscall_number;
-  void **esp = &(f->esp);
-
   syscall_number = *(int *) esp_pop(&(f->esp));
 
   switch (syscall_number) {
     case SYS_HALT:
 //      printf ("syscall HALT called\n");
+        halt ();
       break;
     case SYS_EXIT:
-//      printf ("syscall EXIT called\n");
       read_argument (&(f->esp), args, 1);
       f->eax = *(int *) args[0];
       exit (*(int *) args[0]);
@@ -95,28 +113,36 @@ syscall_handler(struct intr_frame *f) {
 //      printf ("syscall WAIT called\n");
       break;
     case SYS_CREATE:
-
 //      printf ("syscall CREATE called\n");
+      read_argument (&(f->esp), args, 2);
+      privilege_check (args[0]);
+//      printf("%s\n",(char *) *(uint32_t *) args[0]);
+      f->eax = create ( (char *) *(uint32_t *) args[0], *(unsigned *) args[1]);
       break;
     case SYS_REMOVE:
 //      printf ("syscall REMOVE called\n");
 
       break;
     case SYS_OPEN:
-//      printf ("syscall OPEN called\n");
-
+      read_argument (&(f->esp), args, 1);
+      privilege_check (args[0]);
+//      hex_dump((uintptr_t *) esp, esp, 0xc0000000 - (uint32_t) esp, true);
+      f->eax = open ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_FILESIZE:
+      read_argument (&(f->esp), args, 1);
+      f->eax = filesize(*(int *)args[0]);
 //      printf ("syscall FILESIZE called\n");
-
       break;
     case SYS_READ:
 //      printf ("syscall READ called\n");
-
+      read_argument (&(f->esp), args, 3);
+      privilege_check (args[1]);
+      f->eax = read (*(int *) args[0], (void *) *(uint32_t *) args[1], *(unsigned *) args[2]);
       break;
     case SYS_WRITE:
-      //printf ("syscall WRITE called\n");
       read_argument (&(f->esp), args, 3);
+      privilege_check (args[1]);
       f->eax = write (*(int *) args[0], (void *) *(uint32_t *) args[1], *(unsigned *) args[2]);
       break;
     case SYS_SEEK:
@@ -129,7 +155,9 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_CLOSE:
 //      printf ("syscall CLOSE called\n");
-
+      read_argument (&(f->esp), args, 1);
+      privilege_check (args[1]);
+      close (*(int *) args[0]);
       break;
       /* Project 3 and optionally project 4. */
     case SYS_MMAP:
@@ -164,11 +192,23 @@ syscall_handler(struct intr_frame *f) {
 }
 
 static void
+halt ()
+{
+  shutdown_power_off();
+}
+
+static void
 exit(int status)
 {
   struct thread *t = thread_current ();
   printf("%s: exit(%d)\n", t->name, status);
   thread_exit ();
+}
+
+static bool create
+(const char *filename, unsigned initial_size)
+{
+  return filesys_create (filename, initial_size);
 }
 
 static int
@@ -181,4 +221,57 @@ write (int fd, const void *buffer, unsigned size)
 
     return size;
   }
+}
+
+static int
+open (const char *file_name)
+{
+  struct thread *t = thread_current ();
+  struct file_descriptor fd;
+  struct file *file = NULL;
+
+  memset (&fd, 0, sizeof fd);
+
+  file = filesys_open (file_name);
+  if (file == NULL)
+  {
+    return -1;
+  }
+
+  fd.file = file;
+  fd.fd = ++(t->cur_fd);
+
+  list_push_back (&t->fds, &fd.elem);
+  return fd.fd;
+}
+
+static int
+read (int fd, void *buffer, unsigned length)
+{
+  uint32_t left;
+  uint32_t real;
+  struct file *file = find_file(fd);
+  if (file != NULL){
+    left = file_length(file) - file_tell(file);
+    real = left < length ? left : length;
+    return file_read (file, buffer, real);
+  }
+  return -1;
+}
+
+static int
+filesize (int fd)
+{
+  struct file *file = find_file(fd);
+  if (file != NULL){
+    return file_length(file);
+  }
+  return -1;
+}
+
+static void
+close (int fd)
+{
+  struct file *file = find_file(fd);
+  file_close(file);
 }
