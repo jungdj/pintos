@@ -125,7 +125,6 @@ syscall_handler(struct intr_frame *f) {
     case SYS_OPEN:
       read_argument (&(f->esp), args, 1);
       privilege_check (args[0]);
-//      hex_dump((uintptr_t *) esp, esp, 0xc0000000 - (uint32_t) esp, true);
       f->eax = open ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_FILESIZE:
@@ -146,7 +145,8 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_SEEK:
 //      printf ("syscall SEEK called\n");
-
+      read_argument (&(f->esp), args, 2);
+      seek (*(int *) args[0], *(unsigned *) args[1]);
       break;
     case SYS_TELL:
 //      printf ("syscall TELL called\n");
@@ -155,7 +155,6 @@ syscall_handler(struct intr_frame *f) {
     case SYS_CLOSE:
 //      printf ("syscall CLOSE called\n");
       read_argument (&(f->esp), args, 1);
-      privilege_check (args[1]);
       close (*(int *) args[0]);
       break;
       /* Project 3 and optionally project 4. */
@@ -193,7 +192,7 @@ syscall_handler(struct intr_frame *f) {
 static void
 halt ()
 {
-  shutdown_power_off();
+  shutdown_power_off ();
 }
 
 static void
@@ -202,7 +201,6 @@ exit(int status)
   struct thread *t = thread_current ();
 
   t->exit_status = status;
-  sema_up (&t->wait_sema);
 
   printf("%s: exit(%d)\n", t->name, status);
   thread_exit ();
@@ -212,7 +210,7 @@ static int
 exec (const char *cmd_line)
 {
   int tid;
-  tid = process_execute(cmd_line);
+  tid = process_execute (cmd_line);
   if (tid == TID_ERROR) {
     return -1;
   }
@@ -238,8 +236,15 @@ write (int fd, const void *buffer, unsigned size)
     putbuf (buffer, size);
     return size;
   } else {
-
-    return size;
+    uint32_t left;
+    uint32_t real;
+    struct file *file = find_file (fd);
+    if (file != NULL){
+      left = file_length (file) - file_tell (file);
+      real = left < size ? left : size;
+      return file_write (file, buffer, real);
+    }
+    return -1;
   }
 }
 
@@ -279,10 +284,19 @@ read (int fd, void *buffer, unsigned length)
   return -1;
 }
 
+static void
+seek (int fd, unsigned position)
+{
+  struct file *file = find_file (fd);
+  if (file != NULL){
+    file_seek (file, position);
+  }
+}
+
 static int
 filesize (int fd)
 {
-  struct file *file = find_file(fd);
+  struct file *file = find_file (fd);
   if (file != NULL){
     return file_length(file);
   }
@@ -292,6 +306,6 @@ filesize (int fd)
 static void
 close (int fd)
 {
-  struct file *file = find_file(fd);
-  file_close(file);
+  struct file *file = find_file (fd);
+  file_close (file);
 }

@@ -106,6 +106,7 @@ struct thread
     struct list fds;
     struct list children;
     struct semaphore wait_sema;
+    struct file *executable;
     uint64_t cur_fd;
 
 #ifdef USERPROG
