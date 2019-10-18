@@ -286,6 +286,9 @@ filesize (int fd)
 static void
 close (int fd)
 {
-  struct file *file = find_file (fd);
-  file_close (file);
+  struct file_descriptor *fd_info = find_fd (fd);
+  if (fd_info != NULL) {
+    list_remove (&fd_info->elem);
+    file_close (fd_info->file);
+  }
 }

@@ -43,24 +43,35 @@ struct thread* find_thread (int tid)
   return NULL;
 }
 
+struct file_descriptor *
+find_fd (int fd)
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct file_descriptor *fd_info;
+
+  for (e = list_begin (&t->fds); e != list_end (&t->fds); e = e->next)
+  {
+    fd_info = list_entry (e, struct file_descriptor, elem);
+    if (fd_info->fd == fd) {
+      return fd_info;
+    }
+  }
+
+  return NULL;
+}
+
 /* return file that match fd.
  * if there are no matched file, return NULL
  * */
 struct file *
 find_file (int fd)
 {
-  struct thread *t = thread_current ();
-  struct list_elem *e;
   struct file_descriptor *fd_info;
-  struct file *file = NULL;
 
-  for (e = list_begin (&t->fds); e != list_end (&t->fds); e = e->next)
-  {
-    fd_info = list_entry (e, struct file_descriptor, elem);
-    if (fd_info->fd == fd) {
-      file = fd_info->file;
-      return file;
-    }
+  fd_info = find_fd (fd);
+  if (fd_info != NULL) {
+    return fd_info->file;
   }
 
   return NULL;
