@@ -108,8 +108,10 @@ struct thread
     struct list children;
     struct semaphore wait_sema;
     struct semaphore last_moment;
+    struct semaphore process_loaded_sema;
     struct file *executable;
     uint64_t cur_fd;
+    bool process_loaded;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

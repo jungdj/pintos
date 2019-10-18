@@ -45,6 +45,7 @@ process_execute (const char *args)
   tid_t tid;
   struct thread *cur;
   struct thread *child;
+  bool load_success;
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
@@ -54,21 +55,26 @@ process_execute (const char *args)
   if (args_copy == NULL)
     return TID_ERROR;
   strlcpy (args_copy, args, PGSIZE);
-  strlcpy (args_copy2, args, PGSIZE);
+  strlcpy (args_copy2, args, PGSIZE); // TODO : Causing serious memory leak
 
   argc = 0;
   parse_args (args_copy2);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (argv[0], PRI_DEFAULT, start_process, args_copy);
+  child = find_thread (tid);
+  sema_down (&child->process_loaded_sema);
+  load_success = child->process_loaded;
+
   if (tid == TID_ERROR) {
     palloc_free_page (args_copy);
     palloc_free_page (args_copy2);
   } else {
     cur = thread_current ();
-    child = find_thread (tid);
-
     list_push_back (&cur->children, &child->child_elem);
+  }
+  if (!load_success) {
+    return -1;
   }
   return tid;
 }
@@ -367,9 +373,10 @@ load (const char *args, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-
+  t->process_loaded = true;
  done:
   /* We arrive here whether the load is successful or not. */
+  sema_up (&t->process_loaded_sema);
   return success;
 }
 
