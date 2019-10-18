@@ -28,6 +28,19 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+struct thread* find_thread (int tid)
+{
+  struct list_elem *e;
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = e->next)
+  {
+    struct thread *t = list_entry (e, struct thread, allelem);
+    if (t->tid == tid) {
+      return t;
+    }
+  }
+  return NULL;
+}
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -293,6 +306,7 @@ thread_exit (void)
      when it calls thread_schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
+  list_remove (&thread_current()->child_elem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -466,6 +480,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   list_init (&t->fds);
   t->cur_fd = 2;
+  list_init (&t->children);
+  sema_init (&t->wait_sema, 0);
+  t->exit_status = -1;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

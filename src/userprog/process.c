@@ -43,6 +43,8 @@ process_execute (const char *args)
 {
   char *args_copy, *args_copy2;
   tid_t tid;
+  struct thread *cur;
+  struct thread *child;
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
@@ -54,6 +56,7 @@ process_execute (const char *args)
   strlcpy (args_copy, args, PGSIZE);
   strlcpy (args_copy2, args, PGSIZE);
 
+  argc = 0;
   parse_args (args_copy2);
 
   /* Create a new thread to execute FILE_NAME. */
@@ -61,6 +64,11 @@ process_execute (const char *args)
   if (tid == TID_ERROR) {
     palloc_free_page (args_copy);
     palloc_free_page (args_copy2);
+  } else {
+    cur = thread_current ();
+    child = find_thread (tid);
+
+    list_push_back (&cur->children, &child->child_elem);
   }
   return tid;
 }
@@ -106,9 +114,27 @@ start_process (void *args_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
-  for (int i=50000000; i>0; i--) {}
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  for (e = list_begin (&cur->children); e != list_end (&cur->children); e = e->next)
+  {
+    struct thread *child = list_entry (e, struct thread, child_elem);
+    if (child->tid == child_tid) {
+      if (child->status == THREAD_DYING) { // 지금은 의미 없음~ Dead thread's status list 만들어야할듯
+        int val = child->exit_status;
+        child->exit_status = -1;
+        return val;
+      }
+      sema_down(&child->wait_sema);
+      sema_up(&child->wait_sema);
+      int val = child->exit_status;
+      child->exit_status = -1;
+      return val;
+    }
+  }
+
   return -1;
 }
 

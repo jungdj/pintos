@@ -9,11 +9,12 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "pagedir.h"
+#include "process.h"
 
 static void syscall_handler (struct intr_frame *);
 static void halt ();
 static void exit (int status);
-static int exec (const char *file);
+static int exec (const char *cmd_line);
 static int wait (int pid);
 static bool create (const char *filename, unsigned initial_size);
 static bool remove (const char *file);
@@ -29,13 +30,6 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-}
-
-static void *
-esp_pop (void **esp)
-{
-  void* val = *esp;
-  return val;
 }
 
 static void
@@ -93,7 +87,8 @@ static void
 syscall_handler(struct intr_frame *f) {
   void *args[3];
   int syscall_number;
-  syscall_number = *(int *) esp_pop(&(f->esp));
+  privilege_check (f->esp);
+  syscall_number = *(int *) (f->esp);
 
   switch (syscall_number) {
     case SYS_HALT:
@@ -107,10 +102,14 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_EXEC:
 //      printf ("syscall EXEC called\n");
+      read_argument (&(f->esp), args, 1);
+      privilege_check (args[0]);
+      f->eax = exec ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_WAIT:
-
 //      printf ("syscall WAIT called\n");
+      read_argument (&(f->esp), args, 1);
+      f->eax = wait (*(int *) args[0]);
       break;
     case SYS_CREATE:
 //      printf ("syscall CREATE called\n");
@@ -201,8 +200,29 @@ static void
 exit(int status)
 {
   struct thread *t = thread_current ();
+
+  t->exit_status = status;
+  sema_up (&t->wait_sema);
+
   printf("%s: exit(%d)\n", t->name, status);
   thread_exit ();
+}
+
+static int
+exec (const char *cmd_line)
+{
+  int tid;
+  tid = process_execute(cmd_line);
+  if (tid == TID_ERROR) {
+    return -1;
+  }
+  return tid;
+}
+
+static int
+wait (int pid)
+{
+  return process_wait (pid);
 }
 
 static bool create
