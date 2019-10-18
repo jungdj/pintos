@@ -192,7 +192,6 @@ exit(int status)
 
   t->exit_status = status;
 
-  printf("%s: exit(%d)\n", t->name, status);
   thread_exit ();
 }
 

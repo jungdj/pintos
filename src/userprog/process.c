@@ -158,6 +158,8 @@ process_exit (void)
     file_close (file);
   }
 
+  printf("%s: exit(%d)\n", cur->name, cur->exit_status);
+
   sema_up (&cur->wait_sema);
   sema_down (&cur->last_moment);
 
