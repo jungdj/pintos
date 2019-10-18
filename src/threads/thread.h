@@ -126,6 +126,8 @@ struct thread
 extern bool thread_mlfqs;
 
 struct thread* find_thread (int tid);
+struct file * find_file (int fd);
+
 void thread_init (void);
 void thread_start (void);
 

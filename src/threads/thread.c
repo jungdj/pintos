@@ -11,6 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -39,6 +41,43 @@ struct thread* find_thread (int tid)
     }
   }
   return NULL;
+}
+
+/* return file that match fd.
+ * if there are no matched file, return NULL
+ * */
+struct file *
+find_file (int fd)
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct file_descriptor *fd_info;
+  struct file *file = NULL;
+
+  for (e = list_begin (&t->fds); e != list_end (&t->fds); e = e->next)
+  {
+    fd_info = list_entry (e, struct file_descriptor, elem);
+    if (fd_info->fd == fd) {
+      file = fd_info->file;
+      return file;
+    }
+  }
+
+  return NULL;
+}
+
+void
+free_fds ()
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct file_descriptor *fd_info;
+
+  while (!list_empty(&t->fds)) {
+    e = list_pop_front(&t->fds);
+    fd_info = list_entry (e, struct file_descriptor, elem);
+    free (fd_info);
+  }
 }
 
 /* Idle thread. */
@@ -304,6 +343,7 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+  free_fds ();
   intr_disable ();
   list_remove (&thread_current()->allelem);
   list_remove (&thread_current()->child_elem);

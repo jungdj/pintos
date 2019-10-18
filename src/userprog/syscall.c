@@ -7,6 +7,7 @@
 #include <filesys/file.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "pagedir.h"
 #include "process.h"
@@ -60,35 +61,13 @@ read_argument (void **esp, void **args, uint8_t num)
   }
 }
 
-/* return file that match fd.
- * if there are no matched file, return NULL
- * */
-static struct file *
-find_file (int fd)
-{
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-  struct file_descriptor *fd_info;
-  struct file *file = NULL;
-
-  for (e = list_begin (&t->fds); e != list_end (&t->fds); e = e->next)
-  {
-    fd_info = list_entry (e, struct file_descriptor, elem);
-    if (fd_info->fd == fd) {
-      file = fd_info->file;
-      return file;
-    }
-  }
-
-  return NULL;
-}
-
 static void
 syscall_handler(struct intr_frame *f) {
   void *args[3];
   int syscall_number;
   privilege_check (f->esp);
   syscall_number = *(int *) (f->esp);
+//  printf("Syscall nunmber %d\n", syscall_number);
 
   switch (syscall_number) {
     case SYS_HALT:
@@ -252,10 +231,11 @@ static int
 open (const char *file_name)
 {
   struct thread *t = thread_current ();
-  struct file_descriptor fd;
+  struct file_descriptor *fd;
   struct file *file = NULL;
 
-  memset (&fd, 0, sizeof fd);
+  fd = (struct file_descriptor *) malloc (sizeof (struct file_descriptor));
+  memset (fd, 0, sizeof (struct file_descriptor));
 
   file = filesys_open (file_name);
   if (file == NULL)
@@ -263,11 +243,11 @@ open (const char *file_name)
     return -1;
   }
 
-  fd.file = file;
-  fd.fd = ++(t->cur_fd);
+  fd->file = file;
+  fd->fd = ++(t->cur_fd);
 
-  list_push_back (&t->fds, &fd.elem);
-  return fd.fd;
+  list_push_back (&t->fds, &fd->elem);
+  return fd->fd;
 }
 
 static int
