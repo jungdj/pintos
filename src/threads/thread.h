@@ -103,9 +103,11 @@ struct thread
     struct list_elem elem;              /* List element. */
 
     struct list_elem child_elem;
+
     struct list fds;
     struct list children;
     struct semaphore wait_sema;
+    struct semaphore last_moment;
     struct file *executable;
     uint64_t cur_fd;
 

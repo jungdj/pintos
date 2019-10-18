@@ -118,19 +118,20 @@ process_wait (tid_t child_tid)
 {
   struct thread *cur = thread_current ();
   struct list_elem *e;
+  int val;
+
   for (e = list_begin (&cur->children); e != list_end (&cur->children); e = e->next)
   {
     struct thread *child = list_entry (e, struct thread, child_elem);
     if (child->tid == child_tid) {
       if (child->status == THREAD_DYING) { // 지금은 의미 없음~ Dead thread's status list 만들어야할듯
-        int val = child->exit_status;
+        val = child->exit_status;
         child->exit_status = -1;
         return val;
       }
       sema_down(&child->wait_sema);
-      sema_up(&child->wait_sema);
-      int val = child->exit_status;
-      child->exit_status = -1;
+      val = child->exit_status;
+      sema_up(&child->last_moment);
       return val;
     }
   }
@@ -145,9 +146,14 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
   struct file *file = cur->executable;
-  file_close (file);
+  if (file != NULL) {
+    file_close (file);
+  }
+
   sema_up (&cur->wait_sema);
+  sema_down (&cur->last_moment);
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

@@ -482,6 +482,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->cur_fd = 2;
   list_init (&t->children);
   sema_init (&t->wait_sema, 0);
+  sema_init (&t->last_moment, 0);
   t->exit_status = -1;
   t->magic = THREAD_MAGIC;
 
