@@ -34,7 +34,7 @@ syscall_init (void)
 }
 
 static void
-privilege_check (void *uaddr)
+is_valid_uaddr (void *uaddr)
 {
   if (uaddr == NULL || !is_user_vaddr(uaddr))
   {
@@ -48,6 +48,16 @@ privilege_check (void *uaddr)
   }
 }
 
+static void
+is_valid_arg (void *arg)
+{
+  if (arg == NULL)
+  {
+    exit (-1);
+  }
+  void* uaddr = (void *) *(uint32_t *) arg;
+  is_valid_uaddr (uaddr);
+}
 
 static void *
 read_argument (void **esp, void **args, uint8_t num)
@@ -65,7 +75,7 @@ static void
 syscall_handler(struct intr_frame *f) {
   void *args[3];
   int syscall_number;
-  privilege_check (f->esp);
+  is_valid_uaddr (f->esp);
   syscall_number = *(int *) (f->esp);
 //  printf("Syscall nunmber %d\n", syscall_number);
 
@@ -82,7 +92,7 @@ syscall_handler(struct intr_frame *f) {
     case SYS_EXEC:
 //      printf ("syscall EXEC called\n");
       read_argument (&(f->esp), args, 1);
-      privilege_check (args[0]);
+      is_valid_arg(args[0]);
       f->eax = exec ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_WAIT:
@@ -93,7 +103,7 @@ syscall_handler(struct intr_frame *f) {
     case SYS_CREATE:
 //      printf ("syscall CREATE called\n");
       read_argument (&(f->esp), args, 2);
-      privilege_check (args[0]);
+      is_valid_arg(args[0]);
 //      printf("%s\n",(char *) *(uint32_t *) args[0]);
       f->eax = create ( (char *) *(uint32_t *) args[0], *(unsigned *) args[1]);
       break;
@@ -103,7 +113,7 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_OPEN:
       read_argument (&(f->esp), args, 1);
-      privilege_check (args[0]);
+      is_valid_arg(args[0]);
       f->eax = open ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_FILESIZE:
@@ -114,12 +124,12 @@ syscall_handler(struct intr_frame *f) {
     case SYS_READ:
 //      printf ("syscall READ called\n");
       read_argument (&(f->esp), args, 3);
-      privilege_check (args[1]);
+      is_valid_arg(args[1]);
       f->eax = read (*(int *) args[0], (void *) *(uint32_t *) args[1], *(unsigned *) args[2]);
       break;
     case SYS_WRITE:
       read_argument (&(f->esp), args, 3);
-      privilege_check (args[1]);
+      is_valid_arg(args[1]);
       f->eax = write (*(int *) args[0], (void *) *(uint32_t *) args[1], *(unsigned *) args[2]);
       break;
     case SYS_SEEK:
