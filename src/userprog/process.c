@@ -42,7 +42,7 @@ parse_args (char *s)
 tid_t
 process_execute (const char *args)
 {
-  char *args_copy, *args_copy2;
+  char *args_copy;
   tid_t tid;
   bool load_success;
   struct pcb *p;
@@ -50,15 +50,13 @@ process_execute (const char *args)
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
   args_copy = palloc_get_page (0);
-  args_copy2 = palloc_get_page (0);
 
   if (args_copy == NULL)
     return TID_ERROR;
   strlcpy (args_copy, args, PGSIZE);
-  strlcpy (args_copy2, args, PGSIZE); // TODO : Causing serious memory leak
 
   argc = 0;
-  parse_args (args_copy2);
+  parse_args (args_copy);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (argv[0], PRI_DEFAULT, start_process, args_copy);
@@ -70,7 +68,6 @@ process_execute (const char *args)
 
   if (tid == TID_ERROR) {
     palloc_free_page (args_copy);
-    palloc_free_page (args_copy2);
   }
   if (!load_success) {
     return -1;
@@ -96,7 +93,7 @@ start_process (void *args_)
 
   /* If load failed, quit. */
   palloc_free_page (args);
-  if (!success) 
+  if (!success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
