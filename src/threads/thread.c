@@ -43,6 +43,92 @@ struct thread* find_thread (int tid)
   return NULL;
 }
 
+
+
+struct list pcbs;
+
+struct pcb* find_pcb (int pid)
+{
+  struct list_elem *e;
+  for (e = list_begin (&pcbs); e != list_end (&pcbs); e = e->next)
+  {
+    struct pcb *p = list_entry (e, struct pcb, elem);
+    if (p->pid == pid) {
+      return p;
+    }
+  }
+  return NULL;
+}
+
+struct pcb*
+find_child_pcb (int pid)
+{
+  struct pcb *p = find_pcb (pid);
+  if (p != NULL)
+    if (p->ppid == thread_tid ())
+      return p;
+  return p;
+}
+
+void
+pcb_set_parent (int pid)
+{
+  struct pcb *p = find_pcb (pid);
+  if (p != NULL)
+    p->ppid = thread_tid ();
+}
+
+bool
+pcb_loaded (int pid)
+{
+  struct pcb *p = find_pcb (pid);
+  if (p != NULL)
+    return p->process_loaded;
+  return false;
+}
+
+void
+pcb_update_loaded ()
+{
+  struct pcb *p = find_pcb (thread_tid ());
+  if (p != NULL)
+    p->process_loaded = true;
+}
+
+void
+pcb_update_status (int status)
+{
+  struct pcb *p = find_pcb (thread_tid ());
+  if (p != NULL)
+    p->exit_status = status;
+}
+
+void
+pcb_wait_sema_up ()
+{
+  struct pcb *p = find_pcb (thread_tid ());
+  if (p != NULL)
+    sema_up (&p->wait_sema);
+}
+
+void
+pcb_p_loaded_sema_up ()
+{
+  struct pcb *p = find_pcb (thread_tid ());
+  if (p != NULL)
+    sema_up (&p->process_loaded_sema);
+}
+
+void
+free_pcb (int pid)
+{
+  struct pcb* p = find_pcb (pid);
+  if (p != NULL)
+    free (p);
+}
+
+
+
 struct file_descriptor *
 find_fd (int fd)
 {
@@ -90,6 +176,8 @@ free_fds ()
     free (fd_info);
   }
 }
+
+
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -155,6 +243,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&pcbs);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -245,6 +334,15 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+
+  /* PCB malloc */
+  struct pcb *new_pcb = (struct pcb *) malloc (sizeof (struct pcb));
+  new_pcb->pid = t->tid;
+  new_pcb->exit_status = -1;
+  new_pcb->process_loaded = false;
+  sema_init (&new_pcb->wait_sema, 0);
+  sema_init (&new_pcb->process_loaded_sema, 0);
+  list_push_back (&pcbs, &new_pcb->elem);
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -357,7 +455,6 @@ thread_exit (void)
   free_fds ();
   intr_disable ();
   list_remove (&thread_current()->allelem);
-  list_remove (&thread_current()->child_elem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
@@ -531,10 +628,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   list_init (&t->fds);
   t->cur_fd = 2;
-  list_init (&t->children);
-  sema_init (&t->wait_sema, 0);
-  sema_init (&t->last_moment, 0);
-  sema_init (&t->process_loaded_sema, 0);
+
   t->exit_status = -1;
   t->magic = THREAD_MAGIC;
 

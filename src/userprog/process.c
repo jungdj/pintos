@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *args, void (**eip) (void), void **esp);
@@ -43,9 +44,8 @@ process_execute (const char *args)
 {
   char *args_copy, *args_copy2;
   tid_t tid;
-  struct thread *cur;
-  struct thread *child;
   bool load_success;
+  struct pcb *p;
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
@@ -62,16 +62,15 @@ process_execute (const char *args)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (argv[0], PRI_DEFAULT, start_process, args_copy);
-  child = find_thread (tid);
-  sema_down (&child->process_loaded_sema);
-  load_success = child->process_loaded;
+  p = find_pcb (tid);
+  pcb_set_parent (tid);
+  sema_down (&p->process_loaded_sema);
+  load_success = pcb_loaded (tid);
+
 
   if (tid == TID_ERROR) {
     palloc_free_page (args_copy);
     palloc_free_page (args_copy2);
-  } else {
-    cur = thread_current ();
-    list_push_back (&cur->children, &child->child_elem);
   }
   if (!load_success) {
     return -1;
@@ -122,27 +121,18 @@ start_process (void *args_)
 int
 process_wait (tid_t child_tid)
 {
-  struct thread *cur = thread_current ();
-  struct list_elem *e;
   int val;
 
-  for (e = list_begin (&cur->children); e != list_end (&cur->children); e = e->next)
-  {
-    struct thread *child = list_entry (e, struct thread, child_elem);
-    if (child->tid == child_tid) {
-      if (child->status == THREAD_DYING) { // 지금은 의미 없음~ Dead thread's status list 만들어야할듯
-        val = child->exit_status;
-        child->exit_status = -1;
-        return val;
-      }
-      sema_down(&child->wait_sema);
-      val = child->exit_status;
-      sema_up(&child->last_moment);
-      return val;
-    }
-  }
+  struct pcb *p = find_child_pcb (child_tid);
 
-  return -1;
+  if (p == NULL)
+    return -1;
+
+  sema_down (&p->wait_sema);
+  val = p->exit_status;
+  list_remove (&p->elem);
+  free (p);
+  return val;
 }
 
 
@@ -159,9 +149,8 @@ process_exit (void)
   }
 
   printf("%s: exit(%d)\n", cur->name, cur->exit_status);
-
-  sema_up (&cur->wait_sema);
-  sema_down (&cur->last_moment);
+  pcb_update_status (cur->exit_status);
+  pcb_wait_sema_up ();
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -375,10 +364,10 @@ load (const char *args, void (**eip) (void), void **esp)
   *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
-  t->process_loaded = true;
+  pcb_update_loaded ();
  done:
   /* We arrive here whether the load is successful or not. */
-  sema_up (&t->process_loaded_sema);
+  pcb_p_loaded_sema_up ();
   return success;
 }
 

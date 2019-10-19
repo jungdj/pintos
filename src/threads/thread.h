@@ -102,16 +102,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    struct list_elem child_elem;
-
     struct list fds;
-    struct list children;
-    struct semaphore wait_sema;
-    struct semaphore last_moment;
-    struct semaphore process_loaded_sema;
     struct file *executable;
     uint64_t cur_fd;
-    bool process_loaded;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -121,6 +114,26 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+struct pcb {
+    int ppid;
+    int pid;
+    int exit_status;
+    bool process_loaded;
+    struct semaphore wait_sema;
+    struct semaphore process_loaded_sema;
+    struct list_elem elem;
+};
+
+struct pcb* find_pcb (int pid);
+struct pcb* find_child_pcb (int pid);
+void pcb_set_parent (int pid);
+bool pcb_loaded (int pid);
+void pcb_update_loaded (void);
+void pcb_update_status (int status);
+void pcb_wait_sema_up (void);
+void pcb_p_loaded_sema_up (void);
+void free_pcb (int pid);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
