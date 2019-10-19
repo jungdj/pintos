@@ -70,6 +70,7 @@ read_argument (void **esp, void **args, uint8_t num)
     args[i] = tmp;
     tmp += 4;
   }
+  is_valid_uaddr (tmp);
 }
 
 static void
@@ -100,6 +101,7 @@ syscall_handler(struct intr_frame *f) {
     case SYS_WAIT:
 //      printf ("syscall WAIT called\n");
       read_argument (&(f->esp), args, 1);
+      is_valid_uaddr (args[0] + 4);
       f->eax = wait (*(int *) args[0]);
       break;
     case SYS_CREATE:
