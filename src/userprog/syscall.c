@@ -27,9 +27,12 @@ static void seek (int fd, unsigned position);
 //static unsigned tell (int fd);
 static void close (int fd);
 
+static struct semaphore filesys_sema;
+
 void
 syscall_init (void) 
 {
+  sema_init (&filesys_sema, 1);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -217,7 +220,11 @@ wait (int pid)
 static bool create
 (const char *filename, unsigned initial_size)
 {
-  return filesys_create (filename, initial_size);
+  bool result;
+  sema_down (&filesys_sema);
+  result = filesys_create (filename, initial_size);
+  sema_up (&filesys_sema);
+  return result;
 }
 
 static int
@@ -229,13 +236,20 @@ write (int fd, const void *buffer, unsigned size)
   } else {
     uint32_t left;
     uint32_t real;
-    struct file *file = find_file (fd);
+    int result = -1;
+    struct file *file;
+
+    sema_down (&filesys_sema);
+    file = find_file (fd);
+
     if (file != NULL){
       left = file_length (file) - file_tell (file);
       real = left < size ? left : size;
-      return file_write (file, buffer, real);
+      result = file_write (file, buffer, real);
     }
-    return -1;
+    sema_up (&filesys_sema);
+
+    return result;
   }
 }
 
@@ -245,21 +259,25 @@ open (const char *file_name)
   struct thread *t = thread_current ();
   struct file_descriptor *fd;
   struct file *file = NULL;
+  int result = -1;
 
   fd = (struct file_descriptor *) malloc (sizeof (struct file_descriptor));
   memset (fd, 0, sizeof (struct file_descriptor));
 
+  sema_down (&filesys_sema);
+
   file = filesys_open (file_name);
-  if (file == NULL)
+  if (file != NULL)
   {
-    return -1;
+    fd->file = file;
+    fd->fd = ++(t->cur_fd);
+
+    list_push_back (&t->fds, &fd->elem);
+    result = fd->fd;
   }
 
-  fd->file = file;
-  fd->fd = ++(t->cur_fd);
-
-  list_push_back (&t->fds, &fd->elem);
-  return fd->fd;
+  sema_up (&filesys_sema);
+  return result;
 }
 
 static int
@@ -267,40 +285,56 @@ read (int fd, void *buffer, unsigned length)
 {
   uint32_t left;
   uint32_t real;
-  struct file *file = find_file(fd);
+  int result = -1;
+  struct file *file;
+  sema_down (&filesys_sema);
+  file = find_file(fd);
+
   if (file != NULL){
     left = file_length(file) - file_tell(file);
     real = left < length ? left : length;
-    return file_read (file, buffer, real);
+    result = file_read (file, buffer, real);
   }
-  return -1;
+
+  sema_up (&filesys_sema);
+  return result;
 }
 
 static void
 seek (int fd, unsigned position)
 {
+  sema_down (&filesys_sema);
   struct file *file = find_file (fd);
+
   if (file != NULL){
     file_seek (file, position);
   }
+  sema_up (&filesys_sema);
 }
 
 static int
 filesize (int fd)
 {
+  int result = -1;
+  sema_down (&filesys_sema);
   struct file *file = find_file (fd);
+
   if (file != NULL){
-    return file_length(file);
+    result = file_length(file);
   }
-  return -1;
+  sema_up (&filesys_sema);
+
+  return result;
 }
 
 static void
 close (int fd)
 {
+  sema_down (&filesys_sema);
   struct file_descriptor *fd_info = find_fd (fd);
   if (fd_info != NULL) {
     list_remove (&fd_info->elem);
     file_close (fd_info->file);
   }
+  sema_up (&filesys_sema);
 }
