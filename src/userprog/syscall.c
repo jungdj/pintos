@@ -27,7 +27,17 @@ static void seek (int fd, unsigned position);
 //static unsigned tell (int fd);
 static void close (int fd);
 
-static struct semaphore filesys_sema;
+struct semaphore filesys_sema;
+
+void sema_up_filesys ()
+{
+  sema_up (&filesys_sema);
+}
+
+void sema_down_filesys ()
+{
+  sema_down (&filesys_sema);
+}
 
 void
 syscall_init (void) 
@@ -306,7 +316,7 @@ seek (int fd, unsigned position)
   sema_down (&filesys_sema);
   struct file *file = find_file (fd);
 
-  if (file != NULL){
+  if (file != NULL) {
     file_seek (file, position);
   }
   sema_up (&filesys_sema);
@@ -335,6 +345,7 @@ close (int fd)
   if (fd_info != NULL) {
     list_remove (&fd_info->elem);
     file_close (fd_info->file);
+    free (fd_info);
   }
   sema_up (&filesys_sema);
 }

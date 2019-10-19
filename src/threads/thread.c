@@ -4,6 +4,7 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+#include <filesys/file.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -15,6 +16,7 @@
 
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "userprog/syscall.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -170,11 +172,14 @@ free_fds ()
   struct list_elem *e;
   struct file_descriptor *fd_info;
 
+  sema_down_filesys ();
   while (!list_empty(&t->fds)) {
     e = list_pop_front(&t->fds);
     fd_info = list_entry (e, struct file_descriptor, elem);
+    file_close (fd_info->file);
     free (fd_info);
   }
+  sema_up_filesys ();
 }
 
 
