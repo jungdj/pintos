@@ -13,18 +13,18 @@
 #include "process.h"
 
 static void syscall_handler (struct intr_frame *);
-static void halt ();
+static void halt (void);
 static void exit (int status);
 static int exec (const char *cmd_line);
 static int wait (int pid);
 static bool create (const char *filename, unsigned initial_size);
-static bool remove (const char *file);
+//static bool remove (const char *file);
 static int open (const char *file);
 static int filesize (int fd);
 static int read (int fd, void *buffer, unsigned length);
 static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
-static unsigned tell (int fd);
+//static unsigned tell (int fd);
 static void close (int fd);
 
 void
@@ -60,7 +60,7 @@ is_valid_arg (void *arg, size_t size)
   is_valid_uaddr (uaddr + size);
 }
 
-static void *
+static void
 read_argument (void **esp, void **args, uint8_t num)
 {
   int i;
