@@ -31,6 +31,8 @@
 #else
 #include "tests/threads/tests.h"
 #endif
+/*for vm*/
+#include "vm/frame.h"
 #ifdef FILESYS
 #include "devices/block.h"
 #include "devices/ide.h"
@@ -119,6 +121,9 @@ main (void)
   thread_start ();
   serial_init_queue ();
   timer_calibrate ();
+
+  /*for VM*/
+  frame_init();
 
 #ifdef FILESYS
   /* Initialize file system. */

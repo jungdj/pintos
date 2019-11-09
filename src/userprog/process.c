@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *args, void (**eip) (void), void **esp);
@@ -49,7 +50,7 @@ process_execute (const char *args)
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
-  args_copy = palloc_get_page (0);
+  args_copy = allocate_frame (0);
 
   if (args_copy == NULL)
     return TID_ERROR;
@@ -449,14 +450,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = allocate_frame (PAL_USER);
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+          deallocate_frame (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -464,7 +465,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+          deallocate_frame (kpage);
           return false; 
         }
 
@@ -487,7 +488,7 @@ setup_stack (void **esp)
   int i;
   uint32_t word_align;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = allocate_frame (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -519,7 +520,7 @@ setup_stack (void **esp)
 //        hex_dump((uintptr_t *) *esp, *esp, 0xc0000000 - (uint32_t) *esp, true);
       }
       else
-        palloc_free_page (kpage);
+        deallocate_frame (kpage);
     }
   return success;
 }
