@@ -19,6 +19,12 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "vm/page.h"
+
+#ifndef VM
+#define vm_frame_allocate(x, y) palloc_get_page(x)
+#define vm_frame_free(x) palloc_free_page(x)
+#endif
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *args, void (**eip) (void), void **esp);
@@ -140,6 +146,7 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  struct hash *spt;
 
   struct file *file = cur->executable;
   if (file != NULL) {
@@ -149,6 +156,14 @@ process_exit (void)
   printf("%s: exit(%d)\n", cur->name, cur->exit_status);
   pcb_update_status (cur->exit_status);
   pcb_wait_sema_up ();
+
+#ifdef VM
+  spt = cur->sup_page_table;
+  if (spt != NULL)
+  {
+    sup_page_destroy (spt);
+  }
+#endif
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -269,7 +284,11 @@ load (const char *args, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
-  if (t->pagedir == NULL) 
+#ifdef VM
+  t->sup_page_table = sup_page_create (); // TODO: Do we need #ifdev VM here?
+#endif
+
+  if (t->pagedir == NULL)
     goto done;
   process_activate ();
   /* Open executable file. */
@@ -450,7 +469,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = allocate_frame (PAL_USER, NULL);
+      uint8_t *kpage = allocate_frame (PAL_USER, NULL); // TODO: Do we need #ifdev VM here?
       if (kpage == NULL)
         return false;
 
@@ -488,7 +507,7 @@ setup_stack (void **esp)
   int i;
   uint32_t word_align;
 
-  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
+  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL); // TODO: Do we need #ifdev VM here?
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -538,9 +557,15 @@ static bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
+  bool success;
 
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
-  return (pagedir_get_page (t->pagedir, upage) == NULL
+  success = (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+
+#ifdef VM
+  success = success && (sup_page_install_frame (t->sup_page_table, upage, kpage));
+#endif
+  return success;
 }
