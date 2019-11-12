@@ -8,3 +8,5 @@ tags
 
 examples/**/*.o
 libc.a
+
+cmake-build-debug/

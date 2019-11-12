@@ -23,7 +23,7 @@ include_directories (userprog)
 include_directories (utils)
 include_directories (vm)
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DUSERPROG")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DUSERPROG -DVM")
 
 set(SOURCE_FILES threads/thread.c
         threads/synch.c
