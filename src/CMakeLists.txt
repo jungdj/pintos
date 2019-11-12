@@ -36,6 +36,9 @@ set(SOURCE_FILES threads/thread.c
         userprog/exception.c
         userprog/process.c
         userprog/syscall.c
+        vm/frame.c
+        vm/page.c
+        vm/swap.c
         filesys/filesys.c
         lib/string.c
         lib/user/syscall.c
