@@ -42,6 +42,7 @@ set(SOURCE_FILES threads/thread.c
         filesys/filesys.c
         lib/string.c
         lib/user/syscall.c
-        lib/kernel/list.c)
+        lib/kernel/list.c
+        lib/kernel/hash.c)
 
 add_executable(pintos ${SOURCE_FILES})
