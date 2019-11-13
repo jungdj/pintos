@@ -103,7 +103,6 @@ sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_
 
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (spt, &spte->h_elem);
-  // TODO: Lazy load frames. -> Done
   if (prev_elem == NULL) return true;
   // TODO: Unexpected dup entry? Need validation?
   printf ("Duplicate entry when reserving new segment from file\n");
@@ -168,7 +167,6 @@ sup_page_load_page (void *vaddr)
   switch (spte->source)
   {
     case FILE_SYS:
-      // TODO: Lazy load file segment -> Done
       writable = spte->file_writable;
       if (!load_from_filesys (spte, frame))
       {

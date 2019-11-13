@@ -469,10 +469,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 #ifdef VM
-      /*
-       * TODO: Paging needed. Implement lazy loading frame.->Done
-       * sup_page_page_segment ()
-       */
       if (!sup_page_reserve_segment (upage, file, ofs, page_read_bytes, page_zero_bytes, writable)) {
         return false;
       }
