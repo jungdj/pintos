@@ -11,7 +11,7 @@ static unsigned
 spte_hash_func(const struct hash_elem *elem, void *aux UNUSED)
 {
   struct sup_page_table_entry *entry = hash_entry (elem, struct sup_page_table_entry, h_elem);
-  return hash_int ((int)entry->user_vaddr);
+  return hash_int ((int)entry->upage);
 }
 
 static bool
@@ -19,7 +19,7 @@ spte_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux U
 {
   struct sup_page_table_entry *a_entry = hash_entry(a, struct sup_page_table_entry, h_elem);
   struct sup_page_table_entry *b_entry = hash_entry(b, struct sup_page_table_entry, h_elem);
-  return a_entry->user_vaddr < b_entry->user_vaddr;
+  return a_entry->upage < b_entry->upage;
 }
 
 static void
@@ -46,10 +46,10 @@ sup_page_destroy (struct hash *sup_page_table)
 }
 
 struct sup_page_table_entry*
-sup_page_table_get_entry (struct hash *sup_page_table, void *vaddr)
+sup_page_table_get_entry (struct hash *sup_page_table, void *upage)
 {
   struct sup_page_table_entry tmp_spte;
-  tmp_spte.user_vaddr = vaddr;
+  tmp_spte.upage = upage;
 
   struct hash_elem *elem = hash_find (sup_page_table, &tmp_spte.h_elem);
   if (elem == NULL) return NULL;
@@ -69,7 +69,7 @@ sup_page_install_zero_page (void *vaddr)
 {
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
-  spte->user_vaddr = vaddr;
+  spte->upage = vaddr;
   spte->source = ALL_ZERO;
 
   struct hash_elem *prev_elem;
@@ -92,7 +92,7 @@ sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_
 {
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
-  spte->user_vaddr = vaddr;
+  spte->upage = vaddr;
 
   spte->source = FILE_SYS;
   spte->file = file;
@@ -139,7 +139,7 @@ load_from_filesys (struct sup_page_table_entry *spte, void *kpage)
    * 2. Load
  */
 bool
-sup_page_load_page (void *vaddr)
+sup_page_load_page (void *upage)
 {
   struct thread *cur = thread_current ();
   uint32_t *pagedir = cur->pagedir;
@@ -148,7 +148,7 @@ sup_page_load_page (void *vaddr)
   void *kpage;
   bool writable = true;
 
-  spte = sup_page_table_get_entry (spt, vaddr);
+  spte = sup_page_table_get_entry (spt, upage);
 
   if(spte == NULL) {
     return false;
@@ -159,6 +159,7 @@ sup_page_load_page (void *vaddr)
     return false; // Duplicate request
   }
 
+  printf("sup_page_load_page upage : %x\n", (int *) upage);
   kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
 
   if (kpage == NULL)
@@ -170,6 +171,7 @@ sup_page_load_page (void *vaddr)
       writable = spte->file_writable;
       if (!load_from_filesys (spte, kpage))
       {
+        printf("Load from filesys fail\n");
         free_frame (kpage);
         return false;
       }
@@ -185,7 +187,7 @@ sup_page_load_page (void *vaddr)
       return false;
   }
 
-  if (!pagedir_set_page (pagedir, vaddr, kpage, writable))
+  if (!pagedir_set_page (pagedir, upage, kpage, writable))
   {
     free_frame (kpage);
     return false;
@@ -203,7 +205,7 @@ bool
 sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
 {
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
-  spte->user_vaddr = upage;
+  spte->upage = upage;
   spte->kpage = kpage;
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?

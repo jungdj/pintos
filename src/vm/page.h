@@ -47,7 +47,7 @@ page_source
 
 struct sup_page_table_entry
 {
-	uint32_t *user_vaddr;
+	uint32_t *upage;
 	uint32_t *kpage;
 
 	// swap_key TODO: swap key if swapped
@@ -78,6 +78,6 @@ bool sup_page_table_has_entry (struct hash *sup_page_table, void *addr);
 bool sup_page_install_zero_page (void *vaddr);
 bool sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable);
 
-bool sup_page_load_page (void *vaddr);
+bool sup_page_load_page (void *upage);
 
 #endif /* vm/page.h */

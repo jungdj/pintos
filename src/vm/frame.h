@@ -10,7 +10,7 @@ struct frame_table_entry
 {
 	uint32_t* frame;
 	struct thread* owner;
-	struct sup_page_table_entry* spte;
+	struct sup_page_table_entry* spte; // Needed?
 	struct hash_elem h_elem;
 	void *page; // Save kernel virtual page address TODO: others use uint8_t as type, why??
 };
