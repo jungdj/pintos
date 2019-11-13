@@ -4,6 +4,10 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "vm/page.h"
+
+#define MAX_STACK_SIZE 0x800000
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -147,6 +151,57 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+#if VM
+  /*
+   * Check if
+   * 0. Only if user page fault
+   * 1. Writing read only page must fail
+   *
+   * Load Page
+   * Get info whether
+   * 0. Has info
+   *  1. From filesys
+   *  2. From swap slot
+   *  3. All zero
+   *  4. Stack growth
+   * 1. Load
+   *
+   * Otherwise,
+   *
+   * Stack growth
+   * Check if
+   * 1. Check if stack growth is caused by PUSH or PUSHA
+   * 2. Absolute limit on stack size (8MB)
+   * */
+
+  if (user && not_present) {
+    struct thread *cur = thread_current ();
+    void *fault_page = (void *) pg_round_down (fault_addr);
+
+    if (sup_page_table_has_entry (cur->sup_page_table, fault_page)) {
+      // Load
+      if (sup_page_load_page (fault_page)) {
+        // Success
+        return;
+      }
+    } else {
+      void *esp = f->esp;
+      bool on_stack = esp <= fault_addr;
+      bool is_push = (fault_addr == esp - 4) || (fault_addr - 32);
+      // TODO: Stack can also grow while decreasing. Check FAQ
+      bool valid_addr = (fault_addr < PHYS_BASE) && (fault_addr >= PHYS_BASE - MAX_STACK_SIZE);
+      if (on_stack && is_push && valid_addr) {
+        // Install zero page for stack growth
+        if (sup_page_install_zero_page (fault_page)) {
+          // Success
+          return;
+        }
+      }
+    }
+    // Fatal fault if not returned
+  }
+#endif
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
