@@ -48,7 +48,7 @@ page_source
 struct sup_page_table_entry
 {
 	uint32_t *user_vaddr;
-	uint32_t *frame;
+	uint32_t *kpage;
 
 	// swap_key TODO: swap key if swapped
 

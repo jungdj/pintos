@@ -111,7 +111,7 @@ sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_
 }
 
 static bool
-load_from_filesys (struct sup_page_table_entry *spte, void *frame)
+load_from_filesys (struct sup_page_table_entry *spte, void *kpage)
 {
   struct file *file = spte->file;
   uint32_t page_read_bytes = spte->file_page_read_bytes;
@@ -120,11 +120,11 @@ load_from_filesys (struct sup_page_table_entry *spte, void *frame)
 
   file_seek (file, ofs);
 
-  if (file_read (file, frame, page_read_bytes) != (int) page_read_bytes)
+  if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
   {
     return false;
   }
-  memset (frame + page_read_bytes, 0, page_zero_bytes);
+  memset (kpage + page_read_bytes, 0, page_zero_bytes);
   return true;
 }
 
@@ -145,7 +145,7 @@ sup_page_load_page (void *vaddr)
   uint32_t *pagedir = cur->pagedir;
   struct hash *spt = cur->sup_page_table;
   struct sup_page_table_entry *spte;
-  void *frame;
+  void *kpage;
   bool writable = true;
 
   spte = sup_page_table_get_entry (spt, vaddr);
@@ -159,18 +159,18 @@ sup_page_load_page (void *vaddr)
     return false; // Duplicate request
   }
 
-  frame = allocate_frame (PAL_USER | PAL_ZERO, NULL);
+  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
 
-  if (frame == NULL)
+  if (kpage == NULL)
     return false;
 
   switch (spte->source)
   {
     case FILE_SYS:
       writable = spte->file_writable;
-      if (!load_from_filesys (spte, frame))
+      if (!load_from_filesys (spte, kpage))
       {
-        free_frame (frame);
+        free_frame (kpage);
         return false;
       }
       break;
@@ -185,15 +185,15 @@ sup_page_load_page (void *vaddr)
       return false;
   }
 
-  if (!pagedir_set_page (pagedir, vaddr, frame, writable))
+  if (!pagedir_set_page (pagedir, vaddr, kpage, writable))
   {
-    free_frame (frame);
+    free_frame (kpage);
     return false;
   }
 
   // Success!
   spte->on_frame = true;
-  spte->frame = frame;
+  spte->kpage = kpage;
 
   return true;
 }
@@ -204,7 +204,7 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
 {
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->user_vaddr = upage;
-  spte->frame = kpage;
+  spte->kpage = kpage;
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?
   if (prev_elem == NULL) {
