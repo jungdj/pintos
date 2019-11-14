@@ -191,7 +191,7 @@ page_fault (struct intr_frame *f)
       bool is_push = (fault_addr == esp - 4) || (fault_addr - 32);
       // TODO: Stack can also grow while decreasing. Check FAQ
       bool valid_addr = (fault_addr < PHYS_BASE) && (fault_addr >= PHYS_BASE - MAX_STACK_SIZE);
-      if (on_stack && is_push && valid_addr) {
+      if ((on_stack || is_push) && valid_addr) {
         // Install zero page for stack growth
         if (sup_page_install_zero_page (fault_page)) {
           // Success

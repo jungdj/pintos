@@ -70,6 +70,11 @@ sup_page_install_zero_page (void *vaddr)
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = vaddr;
+  spte->on_frame = false;
+  spte->writable = true;
+  spte->dirty = false;
+  spte->accessed = false;
+  // TODO: Accessed
   spte->source = ALL_ZERO;
 
   struct hash_elem *prev_elem;
@@ -93,13 +98,18 @@ sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = vaddr;
+  spte->on_frame = false;
+  spte->dirty = false;
+  spte->accessed = false;
+  // TODO: Access time
 
+  printf("Reserve segment %x %x\n", (int *)vaddr, (int *) offset);
   spte->source = FILE_SYS;
   spte->file = file;
   spte->file_offset = offset;
   spte->file_page_read_bytes = page_read_bytes;
   spte->file_page_zero_bytes = page_zero_bytes;
-  spte->file_writable = writable;
+  spte->writable = writable;
 
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (spt, &spte->h_elem);
@@ -146,7 +156,7 @@ sup_page_load_page (void *upage)
   struct hash *spt = cur->sup_page_table;
   struct sup_page_table_entry *spte;
   void *kpage;
-  bool writable = true;
+  bool writable;
 
   spte = sup_page_table_get_entry (spt, upage);
 
@@ -154,6 +164,7 @@ sup_page_load_page (void *upage)
     return false;
   }
 
+  writable = spte->writable;
   if(spte->on_frame) {
     printf ("Dup load request.\n");
     return false; // Duplicate request
@@ -168,7 +179,6 @@ sup_page_load_page (void *upage)
   switch (spte->source)
   {
     case FILE_SYS:
-      writable = spte->file_writable;
       if (!load_from_filesys (spte, kpage))
       {
         printf("Load from filesys fail\n");
@@ -207,6 +217,12 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = upage;
   spte->kpage = kpage;
+  spte->writable = true; // TODO: Hmm..
+
+  spte->on_frame = true;
+  spte->dirty = false;
+  spte->accessed = false;
+
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?
   if (prev_elem == NULL) {

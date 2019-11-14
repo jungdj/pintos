@@ -56,6 +56,8 @@ struct sup_page_table_entry
 
 	struct hash_elem h_elem;
 
+  bool writable;
+
 	bool on_frame;
 	bool dirty;
 	bool accessed;
@@ -66,7 +68,6 @@ struct sup_page_table_entry
   struct file * file;
   off_t file_offset;
   uint32_t file_page_read_bytes, file_page_zero_bytes;
-  bool file_writable;
 };
 
 struct hash* sup_page_create (void);
