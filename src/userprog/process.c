@@ -18,12 +18,13 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+
+#ifdef VM
 #include "vm/frame.h"
 #include "vm/page.h"
-
-#ifndef VM
-#define vm_frame_allocate(x, y) palloc_get_page(x)
-#define vm_frame_free(x) palloc_free_page(x)
+#else
+#define allocate_frame(x, y) palloc_get_page(x)
+#define free_frame(x) palloc_free_page(x)
 #endif
 
 static thread_func start_process NO_RETURN;
