@@ -188,7 +188,7 @@ page_fault (struct intr_frame *f)
     } else {
       void *esp = f->esp;
       bool on_stack = esp <= fault_addr;
-      bool is_push = (fault_addr == esp - 4) || (fault_addr - 32);
+      bool is_push = (fault_addr == esp - 4) || (fault_addr == esp - 32);
       // TODO: Stack can also grow while decreasing. Check FAQ
       bool valid_addr = (fault_addr < PHYS_BASE) && (fault_addr >= PHYS_BASE - MAX_STACK_SIZE);
       if ((on_stack || is_push) && valid_addr) {
