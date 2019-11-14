@@ -469,11 +469,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-#ifdef VM
-      if (!sup_page_reserve_segment (upage, file, ofs, page_read_bytes, page_zero_bytes, writable)) {
-        return false;
-      }
-#else
+//#ifndef VM
+//      if (!sup_page_reserve_segment (upage, file, ofs, page_read_bytes, page_zero_bytes, writable)) {
+//        return false;
+//      }
+//#else
       /* Get a page of memory. */
       uint8_t *kpage = allocate_frame (PAL_USER, NULL);
       if (kpage == NULL)
@@ -493,7 +493,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           free_frame (kpage);
           return false; 
         }
-#endif
+//#endif
 
       /* Advance. */
       read_bytes -= page_read_bytes;
