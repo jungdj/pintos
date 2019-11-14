@@ -170,7 +170,7 @@ sup_page_load_page (void *upage)
     return false; // Duplicate request
   }
 
-  printf("sup_page_load_page upage : %x\n", (int *) upage);
+//  printf("sup_page_load_page upage : %x\n", (int *) upage);
   kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
 
   if (kpage == NULL)
