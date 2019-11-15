@@ -4,5 +4,6 @@
 void syscall_init (void);
 void sema_up_filesys ();
 void sema_down_filesys ();
+void exit (int status);
 
 #endif /* userprog/syscall.h */
