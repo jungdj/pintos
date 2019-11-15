@@ -1,11 +1,12 @@
-#include "vm/swap.h"
-//#include "devices/disk.h"
-#include "threads/synch.h"
 #include <bitmap.h>
+#include "vm/swap.h"
+#include "devices/block.h"
+#include "threads/synch.h"
+#include "threads/vaddr.h"
 
 
 /* The swap device */
-static struct disk *swap_device;
+static struct block *swap_block;
 
 /* Tracks in-use and free swap slots */
 static struct bitmap *swap_table;
@@ -13,13 +14,17 @@ static struct bitmap *swap_table;
 /* Protects swap_table */
 static struct lock swap_lock;
 
+static const size_t sectors_per_page = (PGSIZE / BLOCK_SECTOR_SIZE);
+
 /* 
- * Initialize swap_device, swap_table, and swap_lock.
+ * Initialize swap_block, swap_table, and swap_lock.
  */
 void 
 swap_init (void)
 {
-
+  swap_block = block_get_role (BLOCK_SWAP);
+  lock_init (&swap_lock);
+  swap_table = bitmap_create (block_size (swap_block) / sectors_per_page);
 }
 
 /*
@@ -35,10 +40,20 @@ swap_init (void)
  * of the disk into the frame. 
  */ 
 bool 
-swap_in (void *addr)
+swap_in (size_t swap_index, void *page)
 {
+  if (bitmap_test(swap_table, swap_index) == true) {
+    // still used slot, error
+    PANIC ("Error, invalid read access to unassigned swap block");
+  }
 
+  size_t i;
+  for (i = 0; i < sectors_per_page; ++ i) {
+    block_read (swap_block, swap_index * sectors_per_page + i, page + (BLOCK_SECTOR_SIZE * i)
+    );
+  }
 
+  bitmap_set(swap_table, swap_index, false);
 }
 
 /* 
@@ -55,11 +70,18 @@ swap_in (void *addr)
  * 4. Find a free block to write you data. Use swap table to get track
  * of in-use and free swap slots.
  */
-bool
-swap_out (void)
+size_t
+swap_out (void *addr)
 {
-
-
+  // TODO: Validation?
+  size_t swap_index;
+  size_t i;
+  swap_index = bitmap_scan (swap_table, 0, 1, false);
+  for (i = 0; i < sectors_per_page; ++ i) {
+    block_write (swap_block, swap_index * sectors_per_page + i, addr + (BLOCK_SECTOR_SIZE * i));
+  }
+  bitmap_set (swap_table, swap_index, true);
+  return swap_index;
 }
 
 /* 
