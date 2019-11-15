@@ -41,7 +41,7 @@ struct frame_table_entry*
 get_frame_table_entry (void *kpage)
 {
   struct frame_table_entry tmp_fte;
-  tmp_fte.frame = kpage;
+  tmp_fte.frame = (void *) vtop (kpage);
 
   struct hash_elem *elem = hash_find (&frame_table, &tmp_fte.h_elem);
   if (elem == NULL) return NULL;
