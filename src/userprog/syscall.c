@@ -53,6 +53,14 @@ is_valid_uaddr (void *uaddr)
   {
     exit(-1);
   }
+#ifndef VM
+  /* Check given pointer is mapped or unmapped */
+  uint32_t *pd = thread_current()->pagedir;
+  if (pagedir_get_page (pd, uaddr) == NULL)
+  {
+    exit (-1);
+  }
+#endif
 }
 
 static void
