@@ -114,8 +114,8 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-#ifdef VM
     uint8_t *esp;
+#ifdef VM
     struct hash *sup_page_table;
 #endif
 
