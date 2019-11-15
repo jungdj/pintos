@@ -94,6 +94,7 @@ syscall_handler(struct intr_frame *f) {
   is_valid_uaddr (f->esp + sizeof (int));
   syscall_number = *(int *) (f->esp);
 //  printf("Syscall nunmber %d\n", syscall_number);
+  thread_current ()->esp = f->esp;
 
   switch (syscall_number) {
     case SYS_HALT:

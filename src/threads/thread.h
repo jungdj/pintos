@@ -115,6 +115,7 @@ struct thread
 #endif
 
 #ifdef VM
+    uint8_t *esp;
     struct hash *sup_page_table;
 #endif
 

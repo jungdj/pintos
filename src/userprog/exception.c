@@ -175,7 +175,7 @@ page_fault (struct intr_frame *f)
    * 2. Absolute limit on stack size (8MB)
    * */
 
-  if (user && not_present) {
+  if (not_present) {
     struct thread *cur = thread_current ();
     void *fault_page = (void *) pg_round_down (fault_addr);
 
@@ -186,7 +186,7 @@ page_fault (struct intr_frame *f)
         return;
       }
     } else {
-      void *esp = f->esp;
+      void *esp = user ? f->esp : thread_current ()->esp;
       bool on_stack = esp <= fault_addr;
       bool is_push = (fault_addr == esp - 4) || (fault_addr == esp - 32);
       // TODO: Stack can also grow while decreasing. Check FAQ
