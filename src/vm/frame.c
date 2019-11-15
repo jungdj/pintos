@@ -34,6 +34,7 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
     /* if malloc failed?? */
     frame_entry->t = thread_current();
     frame_entry->allocated_page = upage;
+    frame_entry->physical_memory = new_page;
     
     /* lock before modifying hash */
     lock_acquire(&frame_lock);
@@ -50,7 +51,7 @@ page를 free하고 frame table에서도 제거
 void
 deallocate_frame(void * upage){
     /*temp frame entry to find real frame_entry*/
-    struct frame_entry * temp_frame_entry = malloc(sizeof(struct frame_entry));
+    struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
     /* if malloc failed?? */
     temp_frame_entry->allocated_page = upage;
 
@@ -70,6 +71,24 @@ deallocate_frame(void * upage){
     free(existed_frame_entry);
 }
 
+struct frame_entry *
+lookup_frame(void * ppage){
+    struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
+    temp_frame_entry->physical_memory = ppage;
+
+    struct hash_elem * find_elem = hash_find(&frame_hash, &temp_frame_entry->elem);
+    
+    if (find_elem == NULL){
+        free(temp_frame_entry);
+        return NULL;
+    }
+    
+    struct frame_entry * find_entry = hash_entry(find_elem, struct frame_entry, elem);    
+    free(temp_frame_entry);
+
+    return find_entry;
+}
+
 /*
 frame_hash_function by tid로 하려고 했으나... deallocate에서 구현 문제 발생
 deallocate하려면 page만 가지고 어떤 hash elem일지 유추 가능해야함... list로 짤까?
@@ -87,5 +106,5 @@ frame_less_func (const struct hash_elem *a,
                  void *aux UNUSED){
     struct frame_entry *a_entry = hash_entry(a, struct frame_entry, elem);
     struct frame_entry *b_entry = hash_entry(b, struct frame_entry, elem);
-    return a_entry->allocated_page < b_entry->allocated_page;
+    return a_entry->physical_memory < b_entry->physical_memory;
 }

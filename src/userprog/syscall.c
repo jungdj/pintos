@@ -93,6 +93,7 @@ syscall_handler(struct intr_frame *f) {
   is_valid_uaddr (f->esp);
   is_valid_uaddr (f->esp + sizeof (int));
   syscall_number = *(int *) (f->esp);
+  thread_current()->esp = f->esp;
 //  printf("Syscall nunmber %d\n", syscall_number);
 
   switch (syscall_number) {

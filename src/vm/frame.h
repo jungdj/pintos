@@ -13,3 +13,4 @@ struct frame_entry
 void frame_init(void);
 void * allocate_new_frame(enum palloc_flags flag, void * upage);
 void deallocate_frame(void * page);
+struct frame_entry * lookup_frame(void * upage);

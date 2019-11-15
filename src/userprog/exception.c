@@ -10,14 +10,12 @@
 #include "vm/frame.h"
 #include "vm/page.h"
 
-#define MAX_STACK_SIZE 0x800000
-
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
-bool is_stack_growth(struct intr_frame *f, void* fault_addr);
+bool is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp);
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -158,93 +156,113 @@ page_fault (struct intr_frame *f)
    /* To implement virtual memory, delete the rest of the function
       body, and replace it with code that brings in the page to
       which fault_addr refers. */
+   /*
    printf ("Page fault at %p: %s error %s page in %s context.\n",
             fault_addr,
             not_present ? "not present" : "rights violation",
             write ? "writing" : "reading",
             user ? "user" : "kernel");
+   */
 
-   kill(f);
+   struct thread * t = thread_current();
+   void * esp = user ? f->esp : t->esp;
    /* 
    가장 기본 경우의 수 stack grow인지 아닌지
    터뜨려야하는 경우의 수
    1. 사용자 주소에서 데이터를 기대할 수 없을때
    2. 페이지가 커널 가상메모리 영역에 있을때, 
-   3. 읽기전용에 쓰려고 할때 -> 아직 고려 못함
+   3. 읽기전용에 쓰려고 할때 -> 아직 고려 못함 g d
    */
-   // return;
    
-   // void* fault_page = (void*) pg_round_down(fault_addr);
+   void* fault_page = (void*) pg_round_down(fault_addr);
+   //printf("excpetion start\n");
+   
 
-   // /* valid region에 있다면 --> 정보가 없는 경우*/
-   // if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
-   //    /* get empty frame
-   //       empty frame이 없다면 eviction해서 하나 받아옴
+   /* valid는 아니지만 growable region이라면 */
+   if(is_stack_growth(f, fault_addr, esp)){
+      //printf("first if statement\n");
+      // int add_pages = (LOADER_PHYS_BASE - (unsigned)fault_page)/PGSIZE;
+      // for (int i=0; i<add_pages; i++){
+      void * newpage = allocate_new_frame(0, fault_page);
+      if (newpage == NULL){
+         printf("newpage?? \n\n");
+      }
+      struct frame_entry * frame_entry = lookup_frame(newpage);
+      if(frame_entry == NULL){
+         printf("ah ha!\n\n");
+      } 
+      pagedir_set_page(t->pagedir, frame_entry->allocated_page, frame_entry->physical_memory, true);
+      fault_page += PGSIZE; // for next page chagne esp
+   // }
+      /* not yet implemented */
+      /*
+         User stack에 추가
+         하나 추가할때마다 f->esp = f->esp - PGSIZE 
+         restart process
+      */
+      
+   }
+
+   /* valid region에 있다면 --> 정보가 없는 경우*/
+   else if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
+      printf("second if statement\n");
+      /* get empty frame d c
+         empty frame이 없다면 eviction해서 하나 받아옴
          
-   //       swap page info frame from disk
+         swap page info frame from disk
 
-   //       Modify page and swap management table
+         Modify page and swap management table
 
-   //       restart process
-   //    */
-   //    struct sup_pagetable_entry * sup_entry = sup_lookup(fault_addr);
+         restart process
+      */
+      struct sup_pagetable_entry * sup_entry = sup_lookup(fault_addr);
 
-   //    if (sup_entry == NULL){
-   //       printf("PANIC in first if statement\n");
-   //       kill (f);
-   //    }
+      if (sup_entry == NULL){
+         printf("PANIC in first if statement\n");
+         kill (f);
+      }
       
-   //    //있으면, faulted address를 위한 새로운 프레임을 할당받음
-   //    //이 페이지가 없으면 eviction 시켜야 하는데 일단 죽임
-   //    void* new_frame = allocate_new_frame(0, fault_addr);
-   //    if (new_frame==NULL){
-   //       kill(f);
-   //    }
+      //있으면, faulted address를 위한 새로운 프레임을 할당받음
+      //이 페이지가 없으면 eviction 시켜야 하는데 일단 죽임
+      void* new_frame = allocate_new_frame(0, fault_addr);
+      if (new_frame==NULL){
+         kill(f);
+      }
 
-   //    /*
-   //    new frame에 sup table 참조하여 정보 넣기
-   //    suppage가 status에 따라서 긁어옴
-   //    */
-   //    switch(sup_entry->status){
-   //       case ON_FRAME:
-   //          //이런 케이스 없을 듯
-   //          break;
-   //       case SWAPPED:
-   //          //swap disk 미구현
-   //          break;
-   //       case ON_DISK:
-   //          break;
-   //    }
+      /*
+      new frame에 sup table 참조하여 정보 넣기
+      suppage가 status에 따라서 긁어옴
+      */
+      switch(sup_entry->status){
+         case ON_FRAME:
+            //이런 케이스 없을 듯
+            break;
+         case SWAPPED:
+            //swap disk 미구현
+            break;
+         case ON_DISK:
+            break;
+      }
       
-   //    sup_entry -> status = true;
-   //    sup_entry -> physical_memory = new_frame;
-   //    pagedir_set_dirty(thread_current()->pagedir, new_frame, false);
-   // }
-
-   // /* valid는 아니지만 growable region이라면 */
-   // else if(is_stack_growth(f, fault_addr)){
-   //    kill (f);
-   //    /* not yet implemented */
-   //    /*
-   //       User stack에 추가
-   //       하나 추가할때마다 f->esp = f->esp - PGSIZE 
-   //       restart process
-   //    */
-      
-   // }
-
-   // /* valid도 아니고 grow도 못한다면 죽어라 */
-   // else{
-   //    kill (f);
-   // }
+      sup_entry -> status = true;
+      sup_entry -> physical_memory = new_frame;
+      pagedir_set_dirty(t->pagedir, new_frame, false);
+      kill(f);
+   }
+ 
+   /* valid도 아니고 grow도 못한다면 죽어라 */
+   else{
+      //printf("kill statement\n"); 
+      kill (f);
+   }
 }
 
 bool  
-is_stack_growth(struct intr_frame *f, void* fault_addr){
-   if(!is_user_vaddr(fault_addr) || (f->esp - fault_addr) < 32){
+is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
+   if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32){
       kill(f);
    }
-   if (LOADER_PHYS_BASE - (unsigned)fault_addr <  8<<20){
+   if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }
    return false;
