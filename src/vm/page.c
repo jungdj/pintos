@@ -69,7 +69,9 @@ sup_page_install_zero_page (void *vaddr)
 {
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
+
   spte->upage = vaddr;
+  spte->kpage = NULL;
   spte->on_frame = false;
   spte->writable = true;
   spte->dirty = false;
@@ -98,6 +100,7 @@ sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = vaddr;
+  spte->kpage = NULL;
   spte->on_frame = false;
   spte->dirty = false;
   spte->accessed = false;
