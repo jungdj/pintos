@@ -244,8 +244,6 @@ write (int fd, const void *buffer, unsigned size)
     putbuf (buffer, size);
     return size;
   } else {
-    uint32_t left;
-    uint32_t real;
     int result = -1;
     struct file *file;
 
@@ -253,9 +251,7 @@ write (int fd, const void *buffer, unsigned size)
     file = find_file (fd);
 
     if (file != NULL){
-      left = file_length (file) - file_tell (file);
-      real = left < size ? left : size;
-      result = file_write (file, buffer, real);
+      result = file_write (file, buffer, size);
     }
     sema_up (&filesys_sema);
 
@@ -293,17 +289,13 @@ open (const char *file_name)
 static int
 read (int fd, void *buffer, unsigned length)
 {
-  uint32_t left;
-  uint32_t real;
   int result = -1;
   struct file *file;
   sema_down (&filesys_sema);
   file = find_file(fd);
 
   if (file != NULL){
-    left = file_length(file) - file_tell(file);
-    real = left < length ? left : length;
-    result = file_read (file, buffer, real);
+    result = file_read (file, buffer, length);
   }
 
   sema_up (&filesys_sema);
