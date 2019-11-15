@@ -4,13 +4,20 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+
+#include "userprog/pagedir.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+
+#define MAX_STACK_SIZE 0x800000
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
-
+bool is_stack_growth(struct intr_frame *f, void* fault_addr);
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -127,35 +134,118 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
-  /* Obtain faulting address, the virtual address that was
+   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
      data.  It is not necessarily the address of the instruction
      that caused the fault (that's f->eip).
      See [IA32-v2a] "MOV--Move to/from Control Registers" and
      [IA32-v3a] 5.15 "Interrupt 14--Page Fault Exception
      (#PF)". */
-  asm ("movl %%cr2, %0" : "=r" (fault_addr));
+   asm ("movl %%cr2, %0" : "=r" (fault_addr));
 
-  /* Turn interrupts back on (they were only off so that we could
-     be assured of reading CR2 before it changed). */
-  intr_enable ();
+   /* Turn interrupts back on (they were only off so that we could
+      be assured of reading CR2 before it changed). */
+   intr_enable ();
 
-  /* Count page faults. */
-  page_fault_cnt++;
+   /* Count page faults. */
+   page_fault_cnt++;
 
-  /* Determine cause. */
-  not_present = (f->error_code & PF_P) == 0;
-  write = (f->error_code & PF_W) != 0;
-  user = (f->error_code & PF_U) != 0;
+   /* Determine cause. */
+   not_present = (f->error_code & PF_P) == 0;
+   write = (f->error_code & PF_W) != 0;
+   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+   /* To implement virtual memory, delete the rest of the function
+      body, and replace it with code that brings in the page to
+      which fault_addr refers. */
+   printf ("Page fault at %p: %s error %s page in %s context.\n",
+            fault_addr,
+            not_present ? "not present" : "rights violation",
+            write ? "writing" : "reading",
+            user ? "user" : "kernel");
+
+   kill(f);
+   /* 
+   가장 기본 경우의 수 stack grow인지 아닌지
+   터뜨려야하는 경우의 수
+   1. 사용자 주소에서 데이터를 기대할 수 없을때
+   2. 페이지가 커널 가상메모리 영역에 있을때, 
+   3. 읽기전용에 쓰려고 할때 -> 아직 고려 못함
+   */
+   // return;
+   
+   // void* fault_page = (void*) pg_round_down(fault_addr);
+
+   // /* valid region에 있다면 --> 정보가 없는 경우*/
+   // if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
+   //    /* get empty frame
+   //       empty frame이 없다면 eviction해서 하나 받아옴
+         
+   //       swap page info frame from disk
+
+   //       Modify page and swap management table
+
+   //       restart process
+   //    */
+   //    struct sup_pagetable_entry * sup_entry = sup_lookup(fault_addr);
+
+   //    if (sup_entry == NULL){
+   //       printf("PANIC in first if statement\n");
+   //       kill (f);
+   //    }
+      
+   //    //있으면, faulted address를 위한 새로운 프레임을 할당받음
+   //    //이 페이지가 없으면 eviction 시켜야 하는데 일단 죽임
+   //    void* new_frame = allocate_new_frame(0, fault_addr);
+   //    if (new_frame==NULL){
+   //       kill(f);
+   //    }
+
+   //    /*
+   //    new frame에 sup table 참조하여 정보 넣기
+   //    suppage가 status에 따라서 긁어옴
+   //    */
+   //    switch(sup_entry->status){
+   //       case ON_FRAME:
+   //          //이런 케이스 없을 듯
+   //          break;
+   //       case SWAPPED:
+   //          //swap disk 미구현
+   //          break;
+   //       case ON_DISK:
+   //          break;
+   //    }
+      
+   //    sup_entry -> status = true;
+   //    sup_entry -> physical_memory = new_frame;
+   //    pagedir_set_dirty(thread_current()->pagedir, new_frame, false);
+   // }
+
+   // /* valid는 아니지만 growable region이라면 */
+   // else if(is_stack_growth(f, fault_addr)){
+   //    kill (f);
+   //    /* not yet implemented */
+   //    /*
+   //       User stack에 추가
+   //       하나 추가할때마다 f->esp = f->esp - PGSIZE 
+   //       restart process
+   //    */
+      
+   // }
+
+   // /* valid도 아니고 grow도 못한다면 죽어라 */
+   // else{
+   //    kill (f);
+   // }
 }
 
+bool  
+is_stack_growth(struct intr_frame *f, void* fault_addr){
+   if(!is_user_vaddr(fault_addr) || (f->esp - fault_addr) < 32){
+      kill(f);
+   }
+   if (LOADER_PHYS_BASE - (unsigned)fault_addr <  8<<20){
+      return true;
+   }
+   return false;
+}

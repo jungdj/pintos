@@ -19,6 +19,9 @@
 #include "userprog/syscall.h"
 #endif
 
+#include "vm/frame.h"
+#include "vm/page.h"
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -44,8 +47,6 @@ struct thread* find_thread (int tid)
   }
   return NULL;
 }
-
-
 
 struct list pcbs;
 
@@ -430,6 +431,7 @@ thread_current (void)
      have overflowed its stack.  Each thread has less than 4 kB
      of stack, so a few big automatic arrays or moderate
      recursion can cause stack overflow. */
+  //debug_backtrace_all();
   ASSERT (is_thread (t));
   ASSERT (t->status == THREAD_RUNNING);
 
@@ -458,6 +460,8 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   free_fds ();
+  //sup_pagetable_destroy();
+
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
@@ -635,6 +639,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->cur_fd = 2;
 
   t->exit_status = -1;
+
+  /*for VM*/
+
+  //sup_pagetable_create(t);
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

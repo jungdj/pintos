@@ -19,6 +19,7 @@
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *args, void (**eip) (void), void **esp);
@@ -50,7 +51,7 @@ process_execute (const char *args)
 
   /* Make a copy of args.
      Otherwise there's a race between the caller and load(). */
-  args_copy = allocate_frame (0);
+  args_copy = palloc_get_page (0);
 
   if (args_copy == NULL)
     return TID_ERROR;
@@ -161,11 +162,12 @@ process_exit (void)
          process page directory.  We must activate the base page
          directory before destroying the process's page
          directory, or our active page directory will be one
-         that's been freed (and cleared). */
+         that's been freed (and ㅔㅋed). */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  sup_pagetable_destroy();
 }
 
 /* Sets up the CPU for running user code in the current
@@ -269,6 +271,7 @@ load (const char *args, void (**eip) (void), void **esp)
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
+  sup_pagetable_create(t);
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
@@ -450,25 +453,25 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = allocate_frame (PAL_USER);
+      uint8_t *kpage = allocate_new_frame (PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          deallocate_frame (kpage);
+          palloc_free_page (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
       /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
+      
+if (!install_page (upage, kpage, writable)) 
         {
-          deallocate_frame (kpage);
+          palloc_free_page (kpage);
           return false; 
         }
-
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -487,8 +490,7 @@ setup_stack (void **esp)
   bool success = false;
   int i;
   uint32_t word_align;
-
-  kpage = allocate_frame (PAL_USER | PAL_ZERO);
+  kpage = allocate_new_frame (PAL_USER | PAL_ZERO, PHYS_BASE - PGSIZE);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -538,9 +540,9 @@ static bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
-
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+          && pagedir_set_page (t->pagedir, upage, kpage, writable)
+          && sup_pagetable_set_page(t, upage, kpage));
 }

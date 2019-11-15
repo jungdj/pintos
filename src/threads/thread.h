@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "lib/kernel/hash.h"
 #include "threads/synch.h"
 
 /* States in a thread's life cycle. */
@@ -110,6 +111,7 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    struct hash * sup_pagetable; /* subpage_table*/ 
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

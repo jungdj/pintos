@@ -32,7 +32,10 @@
 #include "tests/threads/tests.h"
 #endif
 /*for vm*/
+#ifdef VM
 #include "vm/frame.h"
+#include "vm/page.h"
+#endif
 #ifdef FILESYS
 #include "devices/block.h"
 #include "devices/ide.h"
@@ -123,8 +126,10 @@ main (void)
   timer_calibrate ();
 
   /*for VM*/
+#ifdef VM
   frame_init();
-
+  sup_pagetable_init();
+#endif
 #ifdef FILESYS
   /* Initialize file system. */
   ide_init ();
