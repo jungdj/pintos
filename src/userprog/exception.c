@@ -153,6 +153,12 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+          fault_addr,
+          not_present ? "not present" : "rights violation",
+          write ? "writing" : "reading",
+          user ? "user" : "kernel");
+
 #if VM
   /*
    * Check if
@@ -181,12 +187,13 @@ page_fault (struct intr_frame *f)
     void *fault_page = (void *) pg_round_down (fault_addr);
 
     if (sup_page_table_has_entry (cur->sup_page_table, fault_page)) {
-      // Load
+      // Lazy loading or Swapped
       if (sup_page_load_page (fault_page)) {
         // Success
         return;
       }
     } else {
+      // Stack Growth
       void *esp = user ? f->esp : thread_current ()->esp;
       bool on_stack = esp <= fault_addr;
       bool is_push = (fault_addr == esp - 4) || (fault_addr == esp - 32);

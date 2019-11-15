@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <hash.h>
+#include "userprog/pagedir.h"
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
 
 static struct lock frame_table_lock;
 static struct hash frame_table;
@@ -34,27 +37,52 @@ frame_init (void)
   hash_init (&frame_table, frame_hash_func, frame_less_func, NULL);
 }
 
+struct frame_table_entry*
+get_frame_table_entry (void *kpage)
+{
+  struct frame_table_entry tmp_fte;
+  tmp_fte.frame = kpage;
+
+  struct hash_elem *elem = hash_find (&frame_table, &tmp_fte.h_elem);
+  if (elem == NULL) return NULL;
+  return hash_entry (elem, struct frame_table_entry, h_elem);
+}
 
 /* 
  * Make a new frame table entry for addr.
  */
 void *
-allocate_frame (enum palloc_flags flags, void *addr UNUSED)
+allocate_frame (enum palloc_flags flags, void *upage)
 {
   ASSERT (flags & PAL_USER)
+  uint8_t *kpage;
+  struct sup_page_table_entry *spte;
+  struct frame_table_entry *fte;
+  size_t swap_index;
 
-  uint8_t *kpage = palloc_get_page (flags);
+  kpage = palloc_get_page (flags);
   // Allocation failed
   if (kpage == NULL) {
+#ifdef VM_SWAP_H
+    kpage = select_victim_frame ();
+    swap_index = swap_out (kpage); // TODO: Swap out
+    fte = get_frame_table_entry (kpage);
+    spte = fte->spte;
+    spte->source = SWAP;
+    spte->swap_index= swap_index;
+    free_frame (kpage);
+#else
     return NULL;
+#endif
   }
 
-  struct frame_table_entry *fte = malloc (sizeof (struct frame_table_entry));
+  fte = malloc (sizeof (struct frame_table_entry));
   // TODO : Check validity ?
   fte->owner = thread_current ();
   fte->frame = (void *) vtop (kpage);
   // TODO: supplementary table ?
-  fte->page = kpage; // TODO: vaddr?
+  fte->kpage = kpage; // TODO: vaddr?
+  fte->upage = upage;
 
   lock_acquire (&frame_table_lock);
   hash_insert (&frame_table, &fte->h_elem);
@@ -92,6 +120,46 @@ free_frame (void *kpage)
   hash_delete (&frame_table, &fte->h_elem);
   lock_release (&frame_table_lock);
 
-  palloc_free_page (fte->page);
+//  pagedir_clear_page (fte->owner->pagedir, fte->upage);
+  palloc_free_page (fte->kpage);
   free (fte);
+}
+
+void *
+select_victim_frame (void)
+{
+  static size_t victim_index = 0;
+  size_t n;
+  struct hash_iterator it;
+  size_t i;
+
+  n = hash_size (&frame_table);
+
+  hash_first (&it, &frame_table);
+  for(i = 0; i <= victim_index; ++i)
+    hash_next (&it);
+
+  do {
+    struct frame_table_entry *fte = hash_entry (hash_cur (&it), struct frame_table_entry, h_elem);
+//    if(fte->pinned) continue;
+    if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
+      return fte;
+    }
+    pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
+    victim_index = (victim_index + 1) % n;
+  } while (hash_next (&it));
+
+  hash_first (&it, &frame_table);
+  hash_next (&it);
+
+  do {
+    struct frame_table_entry *fte = hash_entry(hash_cur (&it), struct frame_table_entry, h_elem);
+//    if(fte->pinned) continue;
+    if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
+      return fte;
+    }
+    // give a second chance.
+    pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
+    victim_index = (victim_index + 1) % n;
+  } while (hash_next(&it));
 }

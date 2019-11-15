@@ -475,7 +475,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 //      }
 //#else
       /* Get a page of memory. */
-      uint8_t *kpage = allocate_frame (PAL_USER, NULL);
+      uint8_t *kpage = allocate_frame (PAL_USER, upage);
       if (kpage == NULL)
         return false;
 
@@ -514,8 +514,8 @@ setup_stack (void **esp)
   int i;
   uint32_t word_align;
 
-  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL); // TODO: Do we need #ifdev VM here?
-  if (kpage != NULL) 
+  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
+  if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)

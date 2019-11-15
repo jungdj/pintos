@@ -95,18 +95,18 @@ sup_page_install_zero_page (void *vaddr)
  * Later, allocate user frame, read file, install page
  */
 bool
-sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable)
+sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable)
 {
   struct hash *spt = thread_current ()->sup_page_table;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
-  spte->upage = vaddr;
+  spte->upage = upage;
   spte->kpage = NULL;
   spte->on_frame = false;
   spte->dirty = false;
   spte->accessed = false;
   // TODO: Access time
 
-  printf("Reserve segment %x %x\n", (int *)vaddr, (int *) offset);
+  printf("Reserve segment %x %x\n", (int *)upage, (int *) offset);
   spte->source = FILE_SYS;
   spte->file = file;
   spte->file_offset = offset;
@@ -190,7 +190,7 @@ sup_page_load_page (void *upage)
       }
       break;
     case SWAP:
-      // TODO: Swap in
+      swap_in (spte->swap_index, upage);
       break;
     case ALL_ZERO:
       // Nothing to do
@@ -217,7 +217,10 @@ sup_page_load_page (void *upage)
 bool
 sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
 {
-  struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
+  struct sup_page_table_entry *spte;
+  struct frame_table_entry *fte;
+
+  spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = upage;
   spte->kpage = kpage;
   spte->writable = true; // TODO: Hmm..
@@ -229,6 +232,8 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   struct hash_elem *prev_elem;
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?
   if (prev_elem == NULL) {
+    fte = get_frame_table_entry(kpage);
+    fte->spte = spte;
     return true;
   }
   else {

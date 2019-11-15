@@ -12,11 +12,13 @@ struct frame_table_entry
 	struct thread* owner;
 	struct sup_page_table_entry* spte; // Needed?
 	struct hash_elem h_elem;
-	void *page; // Save kernel virtual page address TODO: others use uint8_t as type, why??
+	void *kpage; // Save kernel virtual page address TODO: others use uint8_t as type, why??
+	void *upage;
 };
 
 void frame_init (void);
-void *allocate_frame (enum palloc_flags flags, void *addr);
+struct frame_table_entry* get_frame_table_entry (void *kpage);
+void *allocate_frame (enum palloc_flags flags, void *upage);
 void free_frame (void *addr);
-
+void * select_victim_frame (void);
 #endif /* vm/frame.h */

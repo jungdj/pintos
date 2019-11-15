@@ -8,6 +8,7 @@
 #include "filesys/off_t.h"
 #include "threads/synch.h"
 #include "threads/palloc.h"
+#include "vm/swap.h"
 
 /*
  * Do supplementary page tables need supplementary page dir table?
@@ -64,6 +65,11 @@ struct sup_page_table_entry
 
 	enum page_source source;
 
+	/* Swap */
+#ifdef VM_SWAP_H
+	size_t swap_index;
+#endif
+
 	/* File */ // TODO: Can we place these information somewhere else?
   struct file * file;
   off_t file_offset;
@@ -74,10 +80,11 @@ struct hash* sup_page_create (void);
 void sup_page_destroy (struct hash *sup_page_table);
 
 bool sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage);
+struct sup_page_table_entry* sup_page_table_get_entry (struct hash *sup_page_table, void *upage);
 bool sup_page_table_has_entry (struct hash *sup_page_table, void *addr);
 
 bool sup_page_install_zero_page (void *vaddr);
-bool sup_page_reserve_segment (void *vaddr, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable);
+bool sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable);
 
 bool sup_page_load_page (void *upage);
 
