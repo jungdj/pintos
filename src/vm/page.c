@@ -230,9 +230,11 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   spte->accessed = false;
 
   struct hash_elem *prev_elem;
+
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?
+
   if (prev_elem == NULL) {
-    fte = get_frame_table_entry(kpage);
+    fte = get_frame_table_entry (kpage);
     fte->spte = spte;
     return true;
   }

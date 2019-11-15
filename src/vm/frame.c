@@ -60,16 +60,17 @@ allocate_frame (enum palloc_flags flags, void *upage)
   struct frame_table_entry *fte;
   size_t swap_index;
 
+  lock_acquire (&frame_table_lock);
   kpage = palloc_get_page (flags);
   // Allocation failed
   if (kpage == NULL) {
 #ifdef VM_SWAP_H
-    kpage = select_victim_frame ();
+    fte = select_victim_frame ();
+    kpage = fte->kpage;
     swap_index = swap_out (kpage); // TODO: Swap out
-    fte = get_frame_table_entry (kpage);
     spte = fte->spte;
     spte->source = SWAP;
-    spte->swap_index= swap_index;
+    spte->swap_index = swap_index;
     free_frame (kpage);
 #else
     return NULL;
@@ -84,7 +85,6 @@ allocate_frame (enum palloc_flags flags, void *upage)
   fte->kpage = kpage; // TODO: vaddr?
   fte->upage = upage;
 
-  lock_acquire (&frame_table_lock);
   hash_insert (&frame_table, &fte->h_elem);
   lock_release (&frame_table_lock);
 
@@ -94,10 +94,12 @@ allocate_frame (enum palloc_flags flags, void *upage)
 /*
  * Free a frame table entry from kpage.
  * kpage must be kernel virtual address.
+ * Must acquire frame_table_lock beforehand
  */
 void
 free_frame (void *kpage)
 {
+  ASSERT (lock_held_by_current_thread(&frame_table_lock));
   struct frame_table_entry *fte;
   struct frame_table_entry *tmp_fte;
 
@@ -116,9 +118,7 @@ free_frame (void *kpage)
 
   fte = hash_entry (h_elem, struct frame_table_entry, h_elem);
 
-  lock_acquire (&frame_table_lock);
   hash_delete (&frame_table, &fte->h_elem);
-  lock_release (&frame_table_lock);
 
 //  pagedir_clear_page (fte->owner->pagedir, fte->upage);
   palloc_free_page (fte->kpage);
@@ -141,12 +141,12 @@ select_victim_frame (void)
 
   do {
     struct frame_table_entry *fte = hash_entry (hash_cur (&it), struct frame_table_entry, h_elem);
+    victim_index = (victim_index + 1) % n;
 //    if(fte->pinned) continue;
     if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
       return fte;
     }
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
-    victim_index = (victim_index + 1) % n;
   } while (hash_next (&it));
 
   hash_first (&it, &frame_table);
@@ -154,12 +154,12 @@ select_victim_frame (void)
 
   do {
     struct frame_table_entry *fte = hash_entry(hash_cur (&it), struct frame_table_entry, h_elem);
+    victim_index = (victim_index + 1) % n;
 //    if(fte->pinned) continue;
     if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
       return fte;
     }
     // give a second chance.
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
-    victim_index = (victim_index + 1) % n;
   } while (hash_next(&it));
 }
