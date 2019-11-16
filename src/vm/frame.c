@@ -11,10 +11,11 @@
 #include <stdio.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/malloc.h"
 
 static struct hash frame_hash;
 static struct lock frame_lock;
-static struct hash_iterator * evict_iterator;
+struct hash_iterator * evict_iterator;
 
 unsigned frame_hash_func(const struct hash_elem *e, void *aux);
 bool frame_less_func(const struct hash_elem *a, const struct hash_elem *b, void *aux);
@@ -25,6 +26,7 @@ void
 frame_init(){
     hash_init(&frame_hash, frame_hash_func, frame_less_func, NULL);
     lock_init(&frame_lock);
+    evict_iterator = (struct hash_iterator *) malloc (sizeof(struct hash_iterator));
 }
 
 /*
@@ -33,31 +35,42 @@ parameter랑 return을 비슷하게 만들면 될 듯?
 */
 void *
 allocate_new_frame(enum palloc_flags flag, void * upage){
+    //printf("start allocate\n");
     void * new_page = palloc_get_page(PAL_USER | flag); /*frame must "PAL_USER"*/
     //printf("what is new frame for it ? : %p\n", new_page);
-    
     /*eviction mode*/
     if (new_page==NULL){
         /*init iterator or after one cycle*/
-        if (evict_iterator == NULL){
-            hash_first(evict_iterator, &frame_hash);
-        }
+        hash_first(evict_iterator, &frame_hash);
+        hash_next(evict_iterator);
+        ASSERT(evict_iterator != NULL);
         
         // unsigned frame_num = (unsigned) hash_size(&frame_hash);
         // unsigned iter_num = 0;
-    
+
         struct frame_entry * iter_frame_entry;
+
         /*no need to check protected in while loop. becasue it must be accessed*/
+        int i = 0;
         while(iter_check_accessed(evict_iterator)){
+            
+            //printf("how many loop %d/%d\n", i, hash_size(&frame_hash));
             iter_frame_entry = iter_to_frame_entry(evict_iterator);
             
             /*보호 받는 중일때 통과. 아니면 변경*/
             if (!iter_frame_entry->protected){
-                pagedir_set_accessed(iter_frame_entry->t->pagedir, iter_frame_entry->physical_memory, false);
+                //printf("change!\n");
+                pagedir_set_accessed(thread_current()->pagedir, iter_frame_entry->physical_memory, false);
             }
-            evict_iterator = hash_next(evict_iterator);
+            
+            if (hash_next(evict_iterator)){
+                //printf("loop initialized.\n");
+                hash_first(evict_iterator, &frame_hash);
+                hash_next(evict_iterator);                
+            }
+            i++;
         }
-
+        
         /*죽일 애가 담겨있어서 죽이는 과정이 필요함
         swap out 시키고
         supplementary page에 기록하고
@@ -65,35 +78,51 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
         */
         iter_frame_entry = iter_to_frame_entry(evict_iterator);
         size_t swap_table_idx = swap_out(iter_frame_entry->physical_memory);
-        if (swap_table_idx == NULL){
+        if (swap_table_idx == -1){
             printf("PANIC!! swap is full");
         }
-
+        //printf("allocate page %p\n\n",iter_frame_entry->allocated_page);
         /*update sup page table entry*/
-        struct sup_pagetable_entry * sup_entry = sup_lookup(iter_frame_entry->allocated_page);
+        struct sup_pagetable_entry * sup_entry = sup_lookup(thread_current()->sup_pagetable, iter_frame_entry->allocated_page);
+        if(sup_entry==NULL){
+            printf("PANIC!! Cannot find origin");
+        }
         sup_entry->status = SWAPPED;
         sup_entry->physical_memory = NULL;
         sup_entry->swap_table_idx = swap_table_idx;
-        
+        new_page=iter_frame_entry->physical_memory;
         /*free frame entry*/
         free(iter_frame_entry);
+        //printf("finish\n");
     }
     /* if no new_page?? --> evcition*/
     struct frame_entry * frame_entry = malloc(sizeof(struct frame_entry));
+    if (frame_entry == NULL){
+        printf("malloc failed!!\n");
+    }
     /* if malloc failed?? */
     frame_entry->t = thread_current();
     frame_entry->allocated_page = upage;
     frame_entry->physical_memory = new_page;
     frame_entry->protected = false;
 
-    pagedir_set_accessed(frame_entry->t->pagedir, upage, true);
 
+    pagedir_set_accessed(frame_entry->t->pagedir, upage, true);
+    
     /* lock before modifying hash */
     //printf("hash size ? : %d\n", frame_hash.elem_cnt);
     lock_acquire(&frame_lock);
     hash_insert(&frame_hash, &frame_entry->elem);
     lock_release(&frame_lock);
+    //testing
+    // struct hash_elem * temp_elem = hash_find(&frame_hash, &frame_entry->elem);
+    // ASSERT (temp_elem != NULL);
+    // struct frame_entry * temp_entry = hash_entry(temp_elem, struct frame_entry, elem);
+    // ASSERT (temp_entry ->allocated_page != NULL);
+    // ASSERT (temp_entry ->physical_memory != NULL);
+    // ASSERT (temp_entry ->t != NULL);
     //printf("hash size ? : %d\n", frame_hash.elem_cnt);
+    //printf("frame allocation finish\n");
     return (void *)new_page; 
 }
 
@@ -108,7 +137,6 @@ deallocate_frame(void * kpage){
     struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
     /* if malloc failed?? */
     temp_frame_entry->physical_memory = kpage;
-    printf("here?\n\n");
     struct hash_elem * existed_elem = hash_find(&frame_hash, &temp_frame_entry->elem);
     free(temp_frame_entry);
     if (existed_elem == NULL){
@@ -116,8 +144,10 @@ deallocate_frame(void * kpage){
     }
 
     struct frame_entry * existed_frame_entry = hash_entry(existed_elem, struct frame_entry, elem);
+    printf("here\n\n");
     palloc_free_page(kpage);
-    
+    printf("here\n\n");
+
     lock_acquire(&frame_lock);
     hash_delete(&frame_hash, &existed_frame_entry->elem);
     lock_release(&frame_lock);
@@ -129,7 +159,6 @@ struct frame_entry *
 lookup_frame(void * ppage){
     struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
     temp_frame_entry->physical_memory = ppage;
-    printf("here?\n\n");
     //printf("physical memory : %p\n", ppage);
     struct hash_elem * find_elem = hash_find(&frame_hash, &temp_frame_entry->elem);
     
@@ -153,7 +182,7 @@ physical memory로 hash시킴
 unsigned
 frame_hash_func (const struct hash_elem *e, void *aux UNUSED){
     struct frame_entry *frame_entry = hash_entry (e, struct frame_entry, elem);
-    return hash_bytes(frame_entry->physical_memory, sizeof(frame_entry->physical_memory));
+    return hash_bytes(&frame_entry->physical_memory, sizeof(frame_entry->physical_memory));
     //return hash_int((int)&frame_entry->physical_memory);
 }
 
@@ -168,12 +197,19 @@ frame_less_func (const struct hash_elem *a,
 
 struct frame_entry *
 iter_to_frame_entry(struct hash_iterator *i){
+    ASSERT(i!= NULL);
+    //printf("iter_to_frame_entry start\n");
     return hash_entry(hash_cur(i), struct frame_entry, elem);
 }
 
 /*if accessed = true, else false*/
 bool
 iter_check_accessed(struct hash_iterator *i){
+    //printf("iter_check_accessed \n");
     struct frame_entry * iter_entry = iter_to_frame_entry(i);
+    ASSERT(iter_entry != NULL);
+    ASSERT(iter_entry->physical_memory != NULL);
+    ASSERT(iter_entry->allocated_page != NULL);
+    ASSERT(iter_entry->t != NULL);
     return pagedir_is_accessed(iter_entry->t->pagedir, iter_entry->physical_memory);
 }

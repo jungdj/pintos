@@ -347,6 +347,7 @@ load (const char *args, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
+                //printf("before load segment\n\n");
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
@@ -356,7 +357,7 @@ load (const char *args, void (**eip) (void), void **esp)
           break;
         }
     }
-
+  //printf("after load_segment\n");
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
@@ -369,6 +370,7 @@ load (const char *args, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   pcb_p_loaded_sema_up ();
+  //printf("after load segment success : %d \n", success);
   return success;
 }
 
@@ -451,11 +453,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
-
       /* Get a page of memory. */
       uint8_t *kpage = allocate_new_frame (PAL_USER, upage);
-      if (kpage == NULL)  
+      if (kpage == NULL){
+        printf("null errorr!!! \n");
         return false;
+      } 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {

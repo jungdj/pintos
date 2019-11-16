@@ -1,17 +1,25 @@
 #include "vm/swap.h"
 #include "devices/block.h"
 #include "lib/kernel/bitmap.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
 
 #define SECTOR_PER_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
 
-struct block * swap_disk;
-struct bitmap * swap_table;
+static struct block * swap_disk;
+static struct bitmap * swap_table;
+static struct lock swap_lock;
+static size_t swap_size;
 
 void
 swap_init(void){
+    lock_init(&swap_lock);
     swap_disk = block_get_role(BLOCK_SWAP);
-    swap_table = bitmap_create(SECTOR_PER_PAGE);
+    if(swap_disk == NULL){
+        PANIC ("Error: Can't initialize swap block");
+    }
+    swap_size = block_size(swap_disk) / SECTOR_PER_PAGE;
+    swap_table = bitmap_create(swap_size);
     bitmap_set_all(swap_table, true);
 }
 
@@ -22,26 +30,35 @@ return saved index of bitmap
 */
 size_t
 swap_out(void* physical_memory){
+    //printf("swap out start\n");
+    
+    // printf("bitmap_scan true : %d\n", bitmap_scan(swap_disk, 0, 1, true));
+    // printf("bitmap_scan false : %d\n", bitmap_scan(swap_disk, 0, 1, false));
+    lock_acquire(&swap_lock);
     size_t saved_index = bitmap_scan_and_flip(swap_table, 0, 1, true);
-    if (saved_index==NULL){
+    lock_release(&swap_lock);
+    
+    if (saved_index==-1){
         printf("SWAP DISK full!!\n\n");
     }
     
     block_sector_t sector;
     void * memory_partion; 
-        
-    sector = BLOCK_SECTOR_SIZE * saved_index;
+
+    sector = physical_memory + BLOCK_SECTOR_SIZE/* * saved_index*/;
     for(int i=0; i<SECTOR_PER_PAGE; i++){
         memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
         block_write(swap_disk, saved_index*SECTOR_PER_PAGE+i, sector);
-        sector ++;
+        sector += BLOCK_SECTOR_SIZE;
     }
+    // printf("swap out finish\n");
     return saved_index;
 }
 
 /*data swapping_in */
 void
 swap_in(size_t idx, void * physical_memory){
+    printf("swap_in start!\n");
     /* swap 데이터 새로 발급받은 physical memory에 복사*/
     block_sector_t sector;
     void * memory_partion;
@@ -54,7 +71,9 @@ swap_in(size_t idx, void * physical_memory){
     }
     
     /*bitmap set 변경*/
+    lock_acquire(&swap_lock);
     bitmap_set(swap_table, idx, true);
+    lock_release(&swap_lock);
 }
 
 
@@ -63,5 +82,7 @@ void
 swap_free(size_t idx){
     /* 해당 index의 disk 날리고 ==> 꼭 날려야 하나? 참조하는 값만 없애는게 더 효율적일듯
     해당 index 값 true로 변경하면 끝인듯?*/
+    lock_acquire(&swap_lock);
     bitmap_set(swap_table, idx, true);
+    lock_release(&swap_lock);
 }
