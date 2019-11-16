@@ -190,7 +190,7 @@ sup_page_load_page (void *upage)
       }
       break;
     case SWAP:
-      swap_in (spte->swap_index, upage);
+      swap_in (spte->swap_index, kpage);
       break;
     case ALL_ZERO:
       // Nothing to do

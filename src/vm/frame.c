@@ -66,12 +66,14 @@ allocate_frame (enum palloc_flags flags, void *upage)
   if (kpage == NULL) {
 #ifdef VM_SWAP_H
     fte = select_victim_frame ();
+    pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
     swap_index = swap_out (kpage); // TODO: Swap out
     spte = fte->spte;
     spte->source = SWAP;
     spte->swap_index = swap_index;
-    free_frame (kpage);
+    spte->on_frame = false;
+    free_frame_with_lock (kpage);
 #else
     return NULL;
 #endif
@@ -91,13 +93,21 @@ allocate_frame (enum palloc_flags flags, void *upage)
   return kpage;
 }
 
+void
+free_frame (void *kpage)
+{
+  lock_acquire (&frame_table_lock);
+  free_frame_with_lock (kpage);
+  lock_release (&frame_table_lock);
+}
+
 /*
  * Free a frame table entry from kpage.
  * kpage must be kernel virtual address.
  * Must acquire frame_table_lock beforehand
  */
 void
-free_frame (void *kpage)
+free_frame_with_lock (void *kpage)
 {
   ASSERT (lock_held_by_current_thread(&frame_table_lock));
   struct frame_table_entry *fte;
@@ -121,7 +131,7 @@ free_frame (void *kpage)
   hash_delete (&frame_table, &fte->h_elem);
 
 //  pagedir_clear_page (fte->owner->pagedir, fte->upage);
-  palloc_free_page (fte->kpage);
+//  palloc_free_page (fte->kpage);
   free (fte);
 }
 

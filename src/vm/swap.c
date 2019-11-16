@@ -42,15 +42,11 @@ swap_init (void)
 bool 
 swap_in (size_t swap_index, void *page)
 {
-  if (bitmap_test(swap_table, swap_index) == true) {
-    // still used slot, error
-    PANIC ("Error, invalid read access to unassigned swap block");
-  }
+  ASSERT (bitmap_test(swap_table, swap_index));
 
   size_t i;
-  for (i = 0; i < sectors_per_page; ++ i) {
-    block_read (swap_block, swap_index * sectors_per_page + i, page + (BLOCK_SECTOR_SIZE * i)
-    );
+  for (i = 0; i < sectors_per_page; ++i) {
+    block_read (swap_block, swap_index * sectors_per_page + i, page + (BLOCK_SECTOR_SIZE * i));
   }
 
   bitmap_set(swap_table, swap_index, false);
@@ -77,7 +73,7 @@ swap_out (void *addr)
   size_t swap_index;
   size_t i;
   swap_index = bitmap_scan (swap_table, 0, 1, false);
-  for (i = 0; i < sectors_per_page; ++ i) {
+  for (i = 0; i < sectors_per_page; ++i) {
     block_write (swap_block, swap_index * sectors_per_page + i, addr + (BLOCK_SECTOR_SIZE * i));
   }
   bitmap_set (swap_table, swap_index, true);
