@@ -28,7 +28,7 @@ parameter랑 return을 비슷하게 만들면 될 듯?
 void *
 allocate_new_frame(enum palloc_flags flag, void * upage){
     void * new_page = palloc_get_page(PAL_USER | flag); /*frame must "PAL_USER"*/
-    
+    //printf("what is new frame for it ? : %p\n", new_page);
     /* if no new_page?? --> evcition*/
     struct frame_entry * frame_entry = malloc(sizeof(struct frame_entry));
     /* if malloc failed?? */
@@ -37,9 +37,11 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
     frame_entry->physical_memory = new_page;
     
     /* lock before modifying hash */
+    //printf("hash size ? : %d\n", frame_hash.elem_cnt);
     lock_acquire(&frame_lock);
     hash_insert(&frame_hash, &frame_entry->elem);
     lock_release(&frame_lock);
+    //printf("hash size ? : %d\n", frame_hash.elem_cnt);
     return (void *)new_page; 
 }
 
@@ -75,14 +77,15 @@ struct frame_entry *
 lookup_frame(void * ppage){
     struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
     temp_frame_entry->physical_memory = ppage;
-
+    //printf("physical memory : %p\n", ppage);
     struct hash_elem * find_elem = hash_find(&frame_hash, &temp_frame_entry->elem);
     
     if (find_elem == NULL){
+        //printf("Can not find matched elem!\n\n");
         free(temp_frame_entry);
         return NULL;
     }
-    
+    //printf("Find matched elem!\n\n");
     struct frame_entry * find_entry = hash_entry(find_elem, struct frame_entry, elem);    
     free(temp_frame_entry);
 
@@ -97,7 +100,8 @@ physical memory로 hash시킴
 unsigned
 frame_hash_func (const struct hash_elem *e, void *aux UNUSED){
     struct frame_entry *frame_entry = hash_entry (e, struct frame_entry, elem);
-    return hash_int((int)&frame_entry->physical_memory);
+    return hash_bytes(frame_entry->physical_memory, sizeof(frame_entry->physical_memory));
+    //return hash_int((int)&frame_entry->physical_memory);
 }
 
 bool
