@@ -94,6 +94,13 @@ allocate_frame (enum palloc_flags flags, void *upage)
 }
 
 void
+fte_install_spte (void *kpage, struct sup_page_table_entry *spte)
+{
+  struct frame_table_entry *fte = get_frame_table_entry (kpage);
+  fte->spte = spte;
+}
+
+void
 free_frame (void *kpage)
 {
   lock_acquire (&frame_table_lock);

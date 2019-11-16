@@ -19,6 +19,7 @@ struct frame_table_entry
 void frame_init (void);
 struct frame_table_entry* get_frame_table_entry (void *kpage);
 void *allocate_frame (enum palloc_flags flags, void *upage);
+void fte_install_spte (void *kpage, struct sup_page_table_entry *spte);
 void free_frame_with_lock (void *kpage);
 void free_frame (void *addr);
 void * select_victim_frame (void);

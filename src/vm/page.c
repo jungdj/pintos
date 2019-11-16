@@ -67,7 +67,7 @@ sup_page_table_has_entry (struct hash *sup_page_table, void *vaddr)
 bool
 sup_page_install_zero_page (void *vaddr)
 {
-  struct hash *spt = thread_current ()->sup_page_table;
+  struct hash *spt = thread_current ()->spt;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
 
   spte->upage = vaddr;
@@ -97,7 +97,7 @@ sup_page_install_zero_page (void *vaddr)
 bool
 sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable)
 {
-  struct hash *spt = thread_current ()->sup_page_table;
+  struct hash *spt = thread_current ()->spt;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = upage;
   spte->kpage = NULL;
@@ -156,7 +156,7 @@ sup_page_load_page (void *upage)
 {
   struct thread *cur = thread_current ();
   uint32_t *pagedir = cur->pagedir;
-  struct hash *spt = cur->sup_page_table;
+  struct hash *spt = cur->spt;
   struct sup_page_table_entry *spte;
   void *kpage;
   bool writable;
@@ -209,6 +209,7 @@ sup_page_load_page (void *upage)
   // Success!
   spte->on_frame = true;
   spte->kpage = kpage;
+  fte_install_spte (kpage, spte);
 
   return true;
 }
@@ -218,7 +219,6 @@ bool
 sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
 {
   struct sup_page_table_entry *spte;
-  struct frame_table_entry *fte;
 
   spte = malloc (sizeof (struct sup_page_table_entry));
   spte->upage = upage;
@@ -234,8 +234,7 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   prev_elem = hash_insert (sup_page_table, &spte->h_elem); // TODO: Per process access to each hash, need synchronization?
 
   if (prev_elem == NULL) {
-    fte = get_frame_table_entry (kpage);
-    fte->spte = spte;
+    fte_install_spte (kpage, spte);
     return true;
   }
   else {

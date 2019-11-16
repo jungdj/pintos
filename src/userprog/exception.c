@@ -186,7 +186,7 @@ page_fault (struct intr_frame *f)
     struct thread *cur = thread_current ();
     void *fault_page = (void *) pg_round_down (fault_addr);
 
-    if (sup_page_table_has_entry (cur->sup_page_table, fault_page)) {
+    if (sup_page_table_has_entry (cur->spt, fault_page)) {
       // Lazy loading or Swapped
       if (sup_page_load_page (fault_page)) {
         // Success

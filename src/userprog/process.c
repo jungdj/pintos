@@ -159,7 +159,7 @@ process_exit (void)
   pcb_wait_sema_up ();
 
 #ifdef VM
-  spt = cur->sup_page_table;
+  spt = cur->spt;
   if (spt != NULL)
   {
     sup_page_destroy (spt);
@@ -286,7 +286,7 @@ load (const char *args, void (**eip) (void), void **esp)
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
 #ifdef VM
-  t->sup_page_table = sup_page_create (); // TODO: Do we need #ifdev VM here?
+  t->spt = sup_page_create (); // TODO: Do we need #ifdev VM here?
 #endif
 
   if (t->pagedir == NULL)
@@ -572,7 +572,7 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 
 #ifdef VM
-  success = success && (sup_page_install_frame (t->sup_page_table, upage, kpage));
+  success = success && (sup_page_install_frame (t->spt, upage, kpage));
 #endif
   return success;
 }

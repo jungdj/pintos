@@ -116,7 +116,7 @@ struct thread
 
     uint8_t *esp;
 #ifdef VM
-    struct hash *sup_page_table;
+    struct hash *spt;
 #endif
 
     /* Owned by thread.c. */
