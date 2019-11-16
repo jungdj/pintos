@@ -111,9 +111,10 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+    void * esp; /*save stack pointer when kernel stack growth starts*/
 #ifdef VM
     struct hash * sup_pagetable; /* subpage_table*/
-    void * esp; /*save stack pointer when kernel stack growth starts*/ 
+     
 #endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

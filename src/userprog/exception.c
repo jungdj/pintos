@@ -7,6 +7,8 @@
 #include "threads/vaddr.h"
 
 #include "userprog/pagedir.h"
+#include "userprog/syscall.h"
+
 #include "vm/frame.h"
 #include "vm/page.h"
 
@@ -156,16 +158,20 @@ page_fault (struct intr_frame *f)
    /* To implement virtual memory, delete the rest of the function
       body, and replace it with code that brings in the page to
       which fault_addr refers. */
-   /*
+   
    printf ("Page fault at %p: %s error %s page in %s context.\n",
             fault_addr,
             not_present ? "not present" : "rights violation",
             write ? "writing" : "reading",
             user ? "user" : "kernel");
-   */
-
+   
+   
+   #ifdef VM
    struct thread * t = thread_current();
    void * esp = user ? f->esp : t->esp;
+   if (!user){
+      printf("esp for kernel!! : %p\n\n", t->esp);
+   }
    /* 
    가장 기본 경우의 수 stack grow인지 아닌지
    터뜨려야하는 경우의 수
@@ -180,24 +186,19 @@ page_fault (struct intr_frame *f)
 
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      //printf("first if statement\n");
-      // int add_pages = (LOADER_PHYS_BASE - (unsigned)fault_page)/PGSIZE;
-      // for (int i=0; i<add_pages; i++){
-      void * newpage = allocate_new_frame(0, fault_page);
+      printf("first if statement\n");
+      void * newpage = allocate_new_frame(PAL_ZERO, fault_page);
       if (newpage == NULL){
          printf("newpage?? \n\n");
       }
-      struct frame_entry * frame_entry = lookup_frame(newpage);
-      if(frame_entry == NULL){
-         printf("ah ha!\n\n");
-      } 
+      struct frame_entry * frame_entry = lookup_frame(newpage); 
       pagedir_set_page(t->pagedir, frame_entry->allocated_page, frame_entry->physical_memory, true);
-      fault_page += PGSIZE; // for next page chagne esp
-   // }
+      //fault_page += PGSIZE; // for next page chagne esp
+      return; 
       /* not yet implemented */
       /*
          User stack에 추가
-         하나 추가할때마다 f->esp = f->esp - PGSIZE 
+         하나 추가할때마다 f->esp = f->esp  - PGSIZE 
          restart process
       */
       
@@ -248,22 +249,22 @@ page_fault (struct intr_frame *f)
       sup_entry -> physical_memory = new_frame;
       pagedir_set_dirty(t->pagedir, new_frame, false);
       kill(f);
+      return;
    }
  
    /* valid도 아니고 grow도 못한다면 죽어라 */
-   else{
-      //printf("kill statement\n"); 
-      kill (f);
-   }
+   #endif
+   exit (-1);
 }
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32){
+   if(!is_user_vaddr(fault_addr) || (f->esp - fault_addr) > 32){
       kill(f);
    }
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }
+   printf("fault_addr: %x", (unsigned)fault_addr);
    return false;
 }
