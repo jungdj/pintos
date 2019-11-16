@@ -35,6 +35,7 @@
 #ifdef VM
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 #endif
 #ifdef FILESYS
 #include "devices/block.h"
@@ -129,6 +130,7 @@ main (void)
 #ifdef VM
   frame_init();
   sup_pagetable_init();
+  swap_init();
 #endif
 #ifdef FILESYS
   /* Initialize file system. */

@@ -1,10 +1,5 @@
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
-enum page_status{
-    ON_FRAME, /* On main memroy*/
-    SWAPPED, /* On Swapped memory*/
-    ON_DISK /* on disk */
-};
 
 struct frame_entry
 {

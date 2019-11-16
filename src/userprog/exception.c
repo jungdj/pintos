@@ -11,6 +11,7 @@
 
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -181,23 +182,21 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   printf("excpetion start\n");
+   // printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      printf("\nfirst if statement\n");
-      int need_page = (LOADER_PHYS_BASE-(unsigned)fault_addr)/PGSIZE;
-      //printf("need_page : %d \nfault_addr : %p\nPGSIZE : %x\n", need_page, fault_addr, PGSIZE);
-      void * newpage = allocate_new_frame(PAL_ZERO, fault_page);
+      // printf("\nfirst if statement\n");
+      void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
       // if (newpage != NULL){
       //    printf("newpage complete \n");
       // }
-      struct frame_entry * frame_entry = lookup_frame(newpage);
-      if (frame_entry == NULL){
-         printf("lookup_frame fail!!!!!! \n\n");
-      } 
-      pagedir_set_page(t->pagedir, frame_entry->allocated_page, frame_entry->physical_memory, true);
-      //fault_page += PGSIZE; // for next page chagne esp
+      // struct frame_entry * frame_entry = lookup_frame(newpage);
+      // if (frame_entry == NULL){
+      //    printf("lookup_frame fail!!!!!! \n\n");
+      // } 
+      pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+      pagedir_set_accessed(t->pagedir, new_frame, true);
       return; 
       /* not yet implemented */
       /*
@@ -210,50 +209,25 @@ page_fault (struct intr_frame *f)
 
    /* valid region에 있다면 --> 정보가 없는 경우*/
    else if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
-      printf("second if statement\n");
-      /* get empty frame d c
-         empty frame이 없다면 eviction해서 하나 받아옴
-         
-         swap page info frame from disk
-
-         Modify page and swap management table
-
-         restart process
-      */
-      struct sup_pagetable_entry * sup_entry = sup_lookup(fault_addr);
-
+      // printf("second if statement\n");
+      
+      /* data loading in sup table*/
+      struct sup_pagetable_entry * sup_entry = sup_lookup(fault_page);
       if (sup_entry == NULL){
-         printf("PANIC in first if statement\n");
-         exit (-1);
-      }
-      
-      //있으면, faulted address를 위한 새로운 프레임을 할당받음
-      //이 페이지가 없으면 eviction 시켜야 하는데 일단 죽임
-      void* new_frame = allocate_new_frame(0, fault_addr);
-      if (new_frame==NULL){
-         printf("new_frame == null eror!\n\n");
-         exit (-1);
+         //printf("No sup_entry Error\n");
+         exit(-1);
       }
 
-      /*
-      new frame에 sup table 참조하여 정보 넣기
-      suppage가 status에 따라서 긁어옴
-      */
-      switch(sup_entry->status){
-         case ON_FRAME:
-            //이런 케이스 없을 듯
-            break;
-         case SWAPPED:
-            //swap disk 미구현
-            break;
-         case ON_DISK:
-            break;
-      }
+      void* new_frame = allocate_new_frame(0, fault_addr);
+      /*memcpy해서 데이터 가져오기, swap table 고치기*/
+      swap_in(sup_entry->swap_table_idx, new_frame);
       
-      sup_entry -> status = true;
-      sup_entry -> physical_memory = new_frame;
-      pagedir_set_dirty(t->pagedir, new_frame, false);
-      //exit (-1);
+      /*sup page-entry 최신화*/
+      sup_pagetable_set_page(t, fault_page, new_frame);
+
+      /*pagedir 최신화*/
+      pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+      pagedir_set_accessed(t->pagedir, new_frame, true);
       return;
    }
  

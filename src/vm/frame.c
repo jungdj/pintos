@@ -74,7 +74,7 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
         sup_entry->status = SWAPPED;
         sup_entry->physical_memory = NULL;
         sup_entry->swap_table_idx = swap_table_idx;
-
+        
         /*free frame entry*/
         free(iter_frame_entry);
     }
@@ -85,7 +85,9 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
     frame_entry->allocated_page = upage;
     frame_entry->physical_memory = new_page;
     frame_entry->protected = false;
-    
+
+    pagedir_set_accessed(frame_entry->t->pagedir, upage, true);
+
     /* lock before modifying hash */
     //printf("hash size ? : %d\n", frame_hash.elem_cnt);
     lock_acquire(&frame_lock);

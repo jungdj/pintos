@@ -2,6 +2,7 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "page.h"
+#include "vm/swap.h"
 #include "lib/kernel/hash.h"
 #include <stdio.h>
 
@@ -60,6 +61,8 @@ sup_pagetable_set_page(struct thread *t, void* upage, void* ppage){
     sup_entry->status = ON_FRAME;
     sup_entry->allocated_page = upage;
     sup_entry->physical_memory = ppage;
+    sup_entry->swap_table_idx = NULL;
+
     struct hash_elem *hash_elem;
     lock_acquire(&sup_pagetable_lock);
     hash_elem = hash_insert(t->sup_pagetable, &sup_entry->elem);
@@ -134,5 +137,7 @@ This function was created with reference to hash_action function in hash.h.
 */
 void sup_pagetable_destroy_func(struct hash_elem *e, void *aux UNUSED){
     struct sup_pagetable_entry * sup_entry = hash_entry (e, struct sup_pagetable_entry, elem);
+    if(sup_entry->status == SWAPPED)
+        swap_free(sup_entry->swap_table_idx);
     free(sup_entry);
 }
