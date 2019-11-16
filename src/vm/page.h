@@ -20,6 +20,8 @@ struct sup_pagetable_entry
 
     void * allocated_page; /* same as frame_entry in frame.h*/
     void * physical_memory;
+
+    size_t swap_table_idx; /*if SWAPPED, index of sawp table that data saved*/
 };
 
 void sup_pagetable_create(struct thread *t);

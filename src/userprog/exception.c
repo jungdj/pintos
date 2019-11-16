@@ -181,11 +181,11 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   //printf("excpetion start\n");
+   printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      // printf("\nfirst if statement\n");
+      printf("\nfirst if statement\n");
       int need_page = (LOADER_PHYS_BASE-(unsigned)fault_addr)/PGSIZE;
       //printf("need_page : %d \nfault_addr : %p\nPGSIZE : %x\n", need_page, fault_addr, PGSIZE);
       void * newpage = allocate_new_frame(PAL_ZERO, fault_page);
@@ -210,7 +210,7 @@ page_fault (struct intr_frame *f)
 
    /* valid region에 있다면 --> 정보가 없는 경우*/
    else if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
-      //printf("second if statement\n");
+      printf("second if statement\n");
       /* get empty frame d c
          empty frame이 없다면 eviction해서 하나 받아옴
          
@@ -223,7 +223,7 @@ page_fault (struct intr_frame *f)
       struct sup_pagetable_entry * sup_entry = sup_lookup(fault_addr);
 
       if (sup_entry == NULL){
-         //printf("PANIC in first if statement\n");
+         printf("PANIC in first if statement\n");
          exit (-1);
       }
       
@@ -231,6 +231,7 @@ page_fault (struct intr_frame *f)
       //이 페이지가 없으면 eviction 시켜야 하는데 일단 죽임
       void* new_frame = allocate_new_frame(0, fault_addr);
       if (new_frame==NULL){
+         printf("new_frame == null eror!\n\n");
          exit (-1);
       }
 
@@ -264,7 +265,7 @@ page_fault (struct intr_frame *f)
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   if(!is_user_vaddr(fault_addr) || (/*f->esp*/esp - fault_addr) > 32 || fault_addr < 0x08048000){
+   if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32 || fault_addr < 0x08048000){
       exit(-1);
    }
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
