@@ -174,7 +174,7 @@ sup_page_load_page (void *upage)
   }
 
 //  printf("sup_page_load_page upage : %x\n", (int *) upage);
-  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
+  kpage = allocate_frame (PAL_USER | PAL_ZERO, upage);
 
   if (kpage == NULL)
     return false;

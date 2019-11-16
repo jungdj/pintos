@@ -514,7 +514,7 @@ setup_stack (void **esp)
   int i;
   uint32_t word_align;
 
-  kpage = allocate_frame (PAL_USER | PAL_ZERO, NULL);
+  kpage = allocate_frame (PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
   if (kpage != NULL)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
