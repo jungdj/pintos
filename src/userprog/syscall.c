@@ -133,6 +133,7 @@ syscall_handler(struct intr_frame *f) {
       read_argument (&(f->esp), args, 1);
       is_valid_arg(args[0], sizeof (char *));
       f->eax = open ((char *) *(uint32_t *) args[0]);
+      //printf("f->eax is : %d\n", f->eax);
       break;
     case SYS_FILESIZE:
       read_argument (&(f->esp), args, 1);
@@ -216,7 +217,9 @@ static int
 exec (const char *cmd_line)
 {
   int tid;
+  sema_down (&filesys_sema);
   tid = process_execute (cmd_line);
+  sema_up (&filesys_sema);
   if (tid == TID_ERROR) {
     return -1;
   }

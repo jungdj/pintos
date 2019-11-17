@@ -183,7 +183,7 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   //printf("excpetion start\n");
+   // printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
@@ -231,7 +231,7 @@ page_fault (struct intr_frame *f)
       /* data loading in sup table*/
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
       if (fault_entry == NULL){
-         //printf("No sup_entry Error\n");
+         printf("No sup_entry Error\n");
          exit(-1);
       }
 
@@ -261,13 +261,14 @@ page_fault (struct intr_frame *f)
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   //printf("start is_stack_grow\n");
+   // printf("start is_stack_grow\n");
    if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32 || fault_addr < 0x08048000){
       exit(-1);
    }
+   // printf("after is_stack_grow\n");
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }
-   //printf("fault_addr: %x\n", (unsigned)fault_addr);
+   // printf("fault_addr: %x\n", (unsigned)fault_addr);
    return false;
 }
