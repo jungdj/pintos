@@ -70,32 +70,44 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
             }
             i++;
         }
-        
-        /*죽일 애가 담겨있어서 죽이는 과정이 필요함
-        swap out 시키고
-        supplementary page에 기록하고
-        원래 있던 프레임 entry를 free시킨다.
+        /*
+        1. swap table 빈공간 찾기
+        2. sawp out하기
+        3. supplemental page table에 기록하기
+        4. PTE modify하기
         */
         iter_frame_entry = iter_to_frame_entry(evict_iterator);
+        /*1번 2번 동시에*/
         size_t swap_table_idx = swap_out(iter_frame_entry->physical_memory);
         if (swap_table_idx == -1){
             printf("PANIC!! swap is full");
         }
-        //printf("allocate page %p\n\n",iter_frame_entry->allocated_page);
+        
         /*update sup page table entry*/
-        struct sup_pagetable_entry * sup_entry = sup_lookup(thread_current()->sup_pagetable, iter_frame_entry->allocated_page);
+        struct sup_pagetable_entry * sup_entry = sup_lookup(iter_frame_entry->t->sup_pagetable, iter_frame_entry->allocated_page);
         if(sup_entry==NULL){
-            printf("PANIC!! Cannot find origin");
+            printf("PANIC!! Cannot find origin\n");
         }
         sup_entry->status = SWAPPED;
         sup_entry->physical_memory = NULL;
         sup_entry->swap_table_idx = swap_table_idx;
-        new_page=iter_frame_entry->physical_memory;
-        /*free frame entry*/
+
+        /*TODO dirty bit control*/
+
+        //TODO 확신 없음
+        
+        /*free frame entry, resource*/
+        lock_acquire(&frame_lock);
+        hash_delete(&frame_hash, &iter_frame_entry->elem);
+        lock_release(&frame_lock);
+
+        pagedir_clear_page(iter_frame_entry->t->pagedir, iter_frame_entry->allocated_page);
+        palloc_free_page(iter_frame_entry->physical_memory);
         free(iter_frame_entry);
         //printf("finish\n");
+        new_page = palloc_get_page(PAL_USER | flag);
     }
-    /* if no new_page?? --> evcition*/
+    ASSERT (new_page != NULL)
     struct frame_entry * frame_entry = malloc(sizeof(struct frame_entry));
     if (frame_entry == NULL){
         printf("malloc failed!!\n");
@@ -105,7 +117,6 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
     frame_entry->allocated_page = upage;
     frame_entry->physical_memory = new_page;
     frame_entry->protected = false;
-
 
     pagedir_set_accessed(frame_entry->t->pagedir, upage, true);
     

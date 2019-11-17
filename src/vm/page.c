@@ -109,7 +109,7 @@ sup_lookup(struct hash * sup_pagetable, void* upage){
         return NULL;
     }
     free(temp_sup_entry);
-    //printf("sup_lookup end\n");
+    // printf("sup_lookup end\n");
     return hash_entry(find_elem, struct sup_pagetable_entry, elem);
 }
 

@@ -51,19 +51,19 @@ swap_out(void* physical_memory){
         block_write(swap_disk, saved_index*SECTOR_PER_PAGE+i, sector);
         sector += BLOCK_SECTOR_SIZE;
     }
-    // printf("swap out finish\n");
+    //printf("swap out finish\n");
     return saved_index;
 }
 
 /*data swapping_in */
 void
 swap_in(size_t idx, void * physical_memory){
-    printf("swap_in start!\n");
+    //printf("swap_in start!\n");
     /* swap 데이터 새로 발급받은 physical memory에 복사*/
     block_sector_t sector;
     void * memory_partion;
 
-    sector = BLOCK_SECTOR_SIZE * idx;
+    sector = SECTOR_PER_PAGE * idx;
     for (int i =0; i<SECTOR_PER_PAGE; i++){
         memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
         block_read(swap_disk, sector, memory_partion);
@@ -74,6 +74,7 @@ swap_in(size_t idx, void * physical_memory){
     lock_acquire(&swap_lock);
     bitmap_set(swap_table, idx, true);
     lock_release(&swap_lock);
+    //printf("swap_in finish!\n");
 }
 
 

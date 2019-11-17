@@ -170,6 +170,7 @@ page_fault (struct intr_frame *f)
    #ifdef VM
    struct thread * t = thread_current();
    void * esp = user ? f->esp : t->esp;
+   // printf("esp : %p\n", esp);
    // if (!user){
    //    printf("esp for kernel!! : %p\n\n", t->esp);
    // }
@@ -182,11 +183,11 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   //printf("excpetion start\n");
+   // printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      //printf("\nfirst if statement\n");
+      // printf("\first if statement\n");
       void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
       // if (newpage != NULL){
       //    printf("newpage complete \n");
@@ -209,7 +210,7 @@ page_fault (struct intr_frame *f)
 
    /* valid region에 있다면 --> 정보가 없는 경우*/
    else if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
-      //printf("second if statement\n");
+      // printf("second if statement\n");
       
       /* data loading in sup table*/
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
@@ -218,12 +219,17 @@ page_fault (struct intr_frame *f)
          exit(-1);
       }
 
-      void* new_frame = allocate_new_frame(0, fault_addr);
+      void* new_frame = allocate_new_frame(0, fault_page);
       /*memcpy해서 데이터 가져오기, swap table 고치기*/
       swap_in(fault_entry->swap_table_idx, new_frame);
       
       /*sup page-entry 최신화*/
-      sup_pagetable_set_page(t, fault_page, new_frame);
+      if(!sup_pagetable_clear_page(fault_page)){
+         printf("PANIC : clear page failed! \n");
+      }
+      if(!sup_pagetable_set_page(t, fault_page, new_frame)){
+         printf("PANIC : set page failed! \n");
+      }
 
       /*pagedir 최신화*/
       pagedir_set_page(t->pagedir, fault_page, new_frame, true);
@@ -233,19 +239,19 @@ page_fault (struct intr_frame *f)
  
    /* valid도 아니고 grow도 못한다면 죽어라 */
    #endif
-   //printf("kernel kill statement\n");
+   // printf("kernel kill statement\n");
    exit (-1);
 }
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   //printf("start is_stack_grow\n");
+   // printf("start is_stack_grow\n");
    if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32 || fault_addr < 0x08048000){
       exit(-1);
    }
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }
-   //printf("fault_addr: %x", (unsigned)fault_addr);
+   // printf("fault_addr: %x\n", (unsigned)fault_addr);
    return false;
 } 
