@@ -60,7 +60,6 @@ allocate_new_frame(enum palloc_flags flag, void * upage){
     frame_entry->allocated_page = upage;
     frame_entry->physical_memory = new_page;
     frame_entry->protected = false;
-
     pagedir_set_accessed(frame_entry->t->pagedir, upage, true);
     
     /* lock before modifying hash */
@@ -105,7 +104,7 @@ deallocate_frame(void * kpage){
     lock_release(&frame_lock);
 
     /*free physical page*/
-    // pagedir_clear_page(existed_frame_entry->t, existed_frame_entry->allocated_page);
+    //pagedir_clear_page(existed_frame_entry->t, existed_frame_entry->allocated_page);
     palloc_free_page(kpage);
     free(existed_frame_entry);
 }
@@ -147,7 +146,6 @@ evict_frame (void){
 
     /*no need to check protected in while loop. becasue it must be accessed*/
     while(true){
-        //printf()
         iter_frame_entry = list_entry(list_index, struct frame_entry, lelem);
         list_index_move();
         /*보호 받는 중이면 통과. 아니면 변경*/
@@ -205,7 +203,7 @@ list_insert_before_index(struct list_elem *elem){
     /*empty list, initialize*/
     if (list_empty(&frame_list)){
         list_push_front(&frame_list, elem);
-        list_index = elem;
+        list_index_move();
     }else if (list_prev(list_index) == list_head(&frame_list)){
         list_push_front(&frame_list, elem);
     }else{
@@ -220,7 +218,8 @@ if next elem == list_end, get front_elem of list
 */
 void
 list_index_move(void){
-    if (list_index == list_end(&frame_list)){
+    ASSERT(list_size(&frame_list) != 0);
+    if (list_index==NULL || list_index == list_end(&frame_list)){
         list_index = list_front(&frame_list);
     }else{
         list_index = list_next(list_index);

@@ -30,7 +30,7 @@ return saved index of bitmap
 */
 size_t
 swap_out(void* physical_memory){
-    //printf("swap out start\n");
+    //printf("swap_out start\n");
     lock_acquire(&swap_lock);
     size_t saved_index = bitmap_scan_and_flip(swap_table, 0, 1, true);
     lock_release(&swap_lock);
@@ -42,24 +42,24 @@ swap_out(void* physical_memory){
 
     for(int i=0; i<SECTOR_PER_PAGE; i++){
         sector = saved_index * SECTOR_PER_PAGE + i /* * saved_index*/;
-        memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
+        memory_partion = physical_memory + (BLOCK_SECTOR_SIZE * i);
         block_write(swap_disk, sector, memory_partion);
     }
-    //printf("swap out finish\n");
     return saved_index;
 }
 
 /*data swapping_in */
 void
 swap_in(size_t idx, void * physical_memory){
-    //printf("swap_in start!\n");
+    //printf("swap_in start\n");
+    
     /* swap 데이터 새로 발급받은 physical memory에 복사*/
     block_sector_t sector;
     void * memory_partion;
 
     for (int i =0; i<SECTOR_PER_PAGE; i++){
-        sector = SECTOR_PER_PAGE * idx + i;
-        memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
+        sector = idx * SECTOR_PER_PAGE + i;
+        memory_partion = physical_memory + (BLOCK_SECTOR_SIZE * i);
         block_read(swap_disk, sector, memory_partion);
     }
     

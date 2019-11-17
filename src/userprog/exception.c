@@ -183,21 +183,37 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   // printf("excpetion start\n");
+   //printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      // printf("\first if statement\n");
-      void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
+      // printf("first if statement start\n");
       // if (newpage != NULL){
       //    printf("newpage complete \n");
       // }
       // struct frame_entry * frame_entry = lookup_frame(newpage);
       // if (frame_entry == NULL){
       //    printf("lookup_frame fail!!!!!! \n\n");
-      // } 
-      pagedir_set_page(t->pagedir, fault_page, new_frame, true);
-      pagedir_set_accessed(t->pagedir, new_frame, true);
+ 
+      // if(!sup_pagetable_clear_page(t->sup_pagetable, fault_page)){
+      //    printf("PANIC : clear page failed! \n");
+      // }
+      struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
+      if (fault_entry){
+         // printf("NOT NULLLLLLL");
+         // printf("page_status : %d\n", fault_entry->status);
+         void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
+         swap_in(fault_entry->swap_table_idx, new_frame);
+         pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+         //sup_pagetable_set_page(t, fault_page, new_frame);
+      }else{
+         //just stack growth
+         void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
+         pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+      }
+      // printf("pagedir_set_page 1 for true, 0 for false : %d \n", asdf);
+      //pagedir_set_accessed(t->pagedir, new_frame, true);
+      // printf("first if statement end\n");      
       return; 
       /* not yet implemented */
       /*
@@ -222,18 +238,18 @@ page_fault (struct intr_frame *f)
       void* new_frame = allocate_new_frame(0, fault_page);
       /*memcpy해서 데이터 가져오기, swap table 고치기*/
       swap_in(fault_entry->swap_table_idx, new_frame);
-      
-      /*sup page-entry 최신화*/
-      if(!sup_pagetable_clear_page(fault_page)){
-         printf("PANIC : clear page failed! \n");
-      }
-      if(!sup_pagetable_set_page(t, fault_page, new_frame)){
-         printf("PANIC : set page failed! \n");
-      }
+
+      // /*sup page-entry 최신화*/
+      // if(!sup_pagetable_clear_page(t->sup_pagedir, fault_page)){
+      //    printf("PANIC : clear page failed! \n");
+      // }
+      // if(!sup_pagetable_set_page(t, fault_page, new_frame)){
+      //    printf("PANIC : set page failed! \n");
+      // }
 
       /*pagedir 최신화*/
       pagedir_set_page(t->pagedir, fault_page, new_frame, true);
-      pagedir_set_accessed(t->pagedir, new_frame, true);
+      //pagedir_set_accessed(t->pagedir, new_frame, true);
       return;
    }
  
@@ -245,13 +261,13 @@ page_fault (struct intr_frame *f)
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   // printf("start is_stack_grow\n");
+   //printf("start is_stack_grow\n");
    if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32 || fault_addr < 0x08048000){
       exit(-1);
    }
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }
-   // printf("fault_addr: %x\n", (unsigned)fault_addr);
+   //printf("fault_addr: %x\n", (unsigned)fault_addr);
    return false;
-} 
+}
