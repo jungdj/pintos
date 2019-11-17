@@ -31,25 +31,19 @@ return saved index of bitmap
 size_t
 swap_out(void* physical_memory){
     //printf("swap out start\n");
-    
-    // printf("bitmap_scan true : %d\n", bitmap_scan(swap_disk, 0, 1, true));
-    // printf("bitmap_scan false : %d\n", bitmap_scan(swap_disk, 0, 1, false));
     lock_acquire(&swap_lock);
     size_t saved_index = bitmap_scan_and_flip(swap_table, 0, 1, true);
     lock_release(&swap_lock);
     
-    if (saved_index==-1){
-        printf("SWAP DISK full!!\n\n");
-    }
+    ASSERT (saved_index != -1);
     
     block_sector_t sector;
     void * memory_partion; 
 
-    sector = physical_memory + BLOCK_SECTOR_SIZE/* * saved_index*/;
     for(int i=0; i<SECTOR_PER_PAGE; i++){
+        sector = saved_index * SECTOR_PER_PAGE + i /* * saved_index*/;
         memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
-        block_write(swap_disk, saved_index*SECTOR_PER_PAGE+i, sector);
-        sector += BLOCK_SECTOR_SIZE;
+        block_write(swap_disk, sector, memory_partion);
     }
     //printf("swap out finish\n");
     return saved_index;
@@ -63,18 +57,16 @@ swap_in(size_t idx, void * physical_memory){
     block_sector_t sector;
     void * memory_partion;
 
-    sector = SECTOR_PER_PAGE * idx;
     for (int i =0; i<SECTOR_PER_PAGE; i++){
+        sector = SECTOR_PER_PAGE * idx + i;
         memory_partion = physical_memory + BLOCK_SECTOR_SIZE * i;
         block_read(swap_disk, sector, memory_partion);
-        sector ++;
     }
     
     /*bitmap set 변경*/
     lock_acquire(&swap_lock);
     bitmap_set(swap_table, idx, true);
     lock_release(&swap_lock);
-    //printf("swap_in finish!\n");
 }
 
 
