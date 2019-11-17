@@ -26,6 +26,11 @@ static void
 spte_destroy_func(struct hash_elem *elem, void *aux UNUSED)
 {
   struct sup_page_table_entry *entry = hash_entry(elem, struct sup_page_table_entry, h_elem);
+  if (entry->on_frame) {
+    free_frame (entry->kpage);
+  } else if (entry->source == SWAP) {
+    free_swap_slot (entry->swap_index);
+  }
   free (entry);
 }
 

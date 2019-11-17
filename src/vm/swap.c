@@ -80,6 +80,14 @@ swap_out (void *addr)
   return swap_index;
 }
 
+
+void
+free_swap_slot (size_t swap_index)
+{
+  bitmap_set (swap_table, swap_index, false);
+}
+
+
 /* 
  * Read data from swap device to frame. 
  * Look at device/disk.c
