@@ -136,12 +136,14 @@ load_from_filesys (struct sup_page_table_entry *spte, void *kpage)
   uint32_t page_zero_bytes = spte->file_page_zero_bytes;
   off_t ofs = spte->file_offset;
 
+  sema_down_filesys ();
   file_seek (file, ofs);
 
   if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
   {
     return false;
   }
+  sema_up_filesys ();
   memset (kpage + page_read_bytes, 0, page_zero_bytes);
   return true;
 }

@@ -216,7 +216,9 @@ static int
 exec (const char *cmd_line)
 {
   int tid;
+  sema_down (&filesys_sema);
   tid = process_execute (cmd_line);
+  sema_up (&filesys_sema);
   if (tid == TID_ERROR) {
     return -1;
   }
