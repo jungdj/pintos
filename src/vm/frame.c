@@ -66,12 +66,17 @@ allocate_frame (enum palloc_flags flags, void *upage)
   if (kpage == NULL) {
 #ifdef VM_SWAP_H
     fte = select_victim_frame ();
+    spte = fte->spte;
     pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
-    swap_index = swap_out (kpage); // TODO: Swap out
-    spte = fte->spte;
-    spte->source = SWAP;
-    spte->swap_index = swap_index;
+
+    if (pagedir_is_dirty (fte->owner->pagedir, fte->upage) || spte->writable) {
+      swap_index = swap_out (kpage);
+      spte->source = SWAP;
+      spte->swap_index = swap_index;
+    } else {
+      spte->source = FILE_SYS;
+    };
     spte->on_frame = false;
     free_frame_with_lock (kpage);
 #else
