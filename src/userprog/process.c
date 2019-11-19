@@ -475,7 +475,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 //      }
 //#else
       /* Get a page of memory. */
-      uint8_t *kpage = allocate_frame (PAL_USER, upage);
+      uint8_t *kpage = allocate_frame_and_pin (PAL_USER, upage, true);
       if (kpage == NULL)
         return false;
 
@@ -487,6 +487,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
+      fte_update_pinned (kpage, false);
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {

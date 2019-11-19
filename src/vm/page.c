@@ -1,5 +1,6 @@
 #include <filesys/file.h>
 #include <string.h>
+#include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
@@ -70,12 +71,12 @@ sup_page_table_has_entry (struct hash *sup_page_table, void *vaddr)
 }
 
 bool
-sup_page_install_zero_page (void *vaddr)
+sup_page_install_zero_page (void *upage)
 {
   struct hash *spt = thread_current ()->spt;
   struct sup_page_table_entry *spte = malloc (sizeof (struct sup_page_table_entry));
 
-  spte->upage = vaddr;
+  spte->upage = upage;
   spte->kpage = NULL;
   spte->on_frame = false;
   spte->writable = true;
@@ -92,7 +93,7 @@ sup_page_install_zero_page (void *vaddr)
     free (spte);
     return false;
   }
-  return sup_page_load_page (vaddr);
+  return true;
 }
 
 /*
@@ -159,7 +160,7 @@ load_from_filesys (struct sup_page_table_entry *spte, void *kpage)
    * 2. Load
  */
 bool
-sup_page_load_page (void *upage)
+sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new)
 {
   struct thread *cur = thread_current ();
   uint32_t *pagedir = cur->pagedir;
@@ -171,17 +172,21 @@ sup_page_load_page (void *upage)
   spte = sup_page_table_get_entry (spt, upage);
 
   if(spte == NULL) {
+    if (create_new) {
+      sup_page_install_zero_page(upage);
+      return sup_page_load_page_and_pin (upage, pinned, false);
+    }
     return false;
   }
 
   writable = spte->writable;
   if(spte->on_frame) {
-    printf ("Dup load request.\n");
-    return false; // Duplicate request
+    fte_update_pinned (spte->kpage, pinned);
+//    printf ("Dup load request.\n");
+    return true;
   }
 
-//  printf("sup_page_load_page upage : %x\n", (int *) upage);
-  kpage = allocate_frame (PAL_USER | PAL_ZERO, upage);
+  kpage = allocate_frame_and_pin (PAL_USER | PAL_ZERO, upage, pinned);
 
   if (kpage == NULL)
     return false;
@@ -218,6 +223,29 @@ sup_page_load_page (void *upage)
   spte->kpage = kpage;
   fte_install_spte (kpage, spte);
 
+  return true;
+}
+
+bool
+sup_page_load_page (void *upage)
+{
+  return sup_page_load_page_and_pin (upage, false, false);
+}
+
+bool
+sup_page_update_frame_pinned (void *upage, bool pinned)
+{
+  struct thread *cur = thread_current ();
+  struct hash *spt = cur->spt;
+  struct sup_page_table_entry *spte;
+
+  spte = sup_page_table_get_entry (spt, upage);
+
+  if(spte == NULL) {
+    return false;
+  }
+
+  fte_update_pinned (spte->kpage, pinned);
   return true;
 }
 

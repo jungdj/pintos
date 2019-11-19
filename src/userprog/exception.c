@@ -202,8 +202,10 @@ page_fault (struct intr_frame *f)
       if ((on_stack || is_push) && valid_addr) {
         // Install zero page for stack growth
         if (sup_page_install_zero_page (fault_page)) {
-          // Success
-          return;
+          if (sup_page_load_page (fault_page)) {
+            // Success
+            return;
+          }
         }
       }
     }

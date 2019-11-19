@@ -52,7 +52,7 @@ get_frame_table_entry (void *kpage)
  * Make a new frame table entry for addr.
  */
 void *
-allocate_frame (enum palloc_flags flags, void *upage)
+allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
 {
   ASSERT (flags & PAL_USER)
   uint8_t *kpage;
@@ -91,11 +91,25 @@ allocate_frame (enum palloc_flags flags, void *upage)
   // TODO: supplementary table ?
   fte->kpage = kpage; // TODO: vaddr?
   fte->upage = upage;
+  fte->pinned = pinned;
 
   hash_insert (&frame_table, &fte->h_elem);
   lock_release (&frame_table_lock);
 
   return kpage;
+}
+
+void *
+allocate_frame (enum palloc_flags flags, void *upage)
+{
+  allocate_frame_and_pin (flags, upage, false);
+}
+
+void
+fte_update_pinned (void *kpage, bool pinned)
+{
+  struct frame_table_entry *fte = get_frame_table_entry (kpage);
+  fte->pinned = pinned;
 }
 
 void
@@ -164,7 +178,7 @@ select_victim_frame (void)
   do {
     struct frame_table_entry *fte = hash_entry (hash_cur (&it), struct frame_table_entry, h_elem);
     victim_index = (victim_index + 1) % n;
-//    if(fte->pinned) continue;
+    if(fte->pinned) continue;
     if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
       return fte;
     }
@@ -177,11 +191,10 @@ select_victim_frame (void)
   do {
     struct frame_table_entry *fte = hash_entry(hash_cur (&it), struct frame_table_entry, h_elem);
     victim_index = (victim_index + 1) % n;
-//    if(fte->pinned) continue;
+        if(fte->pinned) continue;
     if(!pagedir_is_accessed (fte->owner->pagedir, fte->upage)) {
       return fte;
     }
-    // give a second chance.
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
   } while (hash_next(&it));
 }

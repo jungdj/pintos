@@ -83,9 +83,12 @@ bool sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpa
 struct sup_page_table_entry* sup_page_table_get_entry (struct hash *sup_page_table, void *upage);
 bool sup_page_table_has_entry (struct hash *sup_page_table, void *addr);
 
-bool sup_page_install_zero_page (void *vaddr);
+bool sup_page_install_zero_page (void *upage);
 bool sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_t page_read_bytes, uint32_t page_zero_bytes, bool writable);
 
+bool sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new);
 bool sup_page_load_page (void *upage);
+
+bool sup_page_update_frame_pinned (void *upage, bool pinned);
 
 #endif /* vm/page.h */

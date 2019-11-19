@@ -25,6 +25,8 @@ static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
 //static unsigned tell (int fd);
 static void close (int fd);
+void load_and_pin_buffer (const void *buffer, unsigned length);
+void unpin_buffer (const void *buffer, unsigned length);
 
 struct semaphore filesys_sema;
 
@@ -255,7 +257,13 @@ write (int fd, const void *buffer, unsigned size)
     file = find_file (fd);
 
     if (file != NULL){
+#ifdef VM
+      load_and_pin_buffer (buffer, size);
+#endif
       result = file_write (file, buffer, size);
+#ifdef VM
+      unpin_buffer (buffer, size);
+#endif
     }
     sema_up (&filesys_sema);
 
@@ -299,7 +307,13 @@ read (int fd, void *buffer, unsigned length)
   file = find_file(fd);
 
   if (file != NULL){
+#ifdef VM
+    load_and_pin_buffer (buffer, length);
+#endif
     result = file_read (file, buffer, length);
+#ifdef VM
+    unpin_buffer (buffer, length);
+#endif
   }
 
   sema_up (&filesys_sema);
@@ -344,4 +358,24 @@ close (int fd)
     free (fd_info);
   }
   sema_up (&filesys_sema);
+}
+
+void
+load_and_pin_buffer (const void *buffer, unsigned length)
+{
+  void *upage;
+  for(upage = pg_round_down (buffer); upage < buffer + length; upage += PGSIZE)
+  {
+    sup_page_load_page_and_pin (upage, true, true);
+  }
+}
+
+void
+unpin_buffer (const void *buffer, unsigned length)
+{
+  void *upage;
+  for(upage = pg_round_down (buffer); upage < buffer + length; upage += PGSIZE)
+  {
+    sup_page_update_frame_pinned (upage, false);
+  }
 }
