@@ -48,13 +48,14 @@ upage가
 bool
 sup_pagetable_set_page(struct thread *t, void* upage, void* ppage){
     struct sup_pagetable_entry * sup_entry = (struct sup_pagetable_entry *)malloc(sizeof(struct sup_pagetable_entry));
+
     ASSERT (sup_entry != NULL);
 
     sup_entry->status = ON_FRAME;
     sup_entry->allocated_page = upage;
     sup_entry->physical_memory = ppage;
     sup_entry->swap_table_idx = NULL;
-    //printf("allocate_page %p\n", upage);
+
     struct hash_elem *hash_elem;
     hash_elem = hash_insert(t->sup_pagetable, &sup_entry->elem);
     if (hash_elem == NULL){
@@ -73,16 +74,6 @@ clear 조건은 아직 생각을 못했음. 언제 clear 해야 하지 -> sup pa
 bool
 sup_pagetable_clear_page (struct hash * sup_pagetable, void* upage) 
 {
-    // struct hash * sup_pagetable = thread_current()->sup_pagetable;
-    // struct sup_pagetable_entry * temp_sup_entry = (struct sup_pagetable_entry *)malloc(sizeof(struct sup_pagetable_entry *));
-    // temp_sup_entry->allocated_page = upage;
-    // struct hash_elem * find_elem = hash_find(sup_pagetable, &temp_sup_entry->elem);
-    // free(temp_sup_entry);
-
-    // if (find_elem == NULL){
-    //     return false;
-    // }
-    // struct sup_pagetable_entry * existed_pagetable_entry = hash_entry(find_elem, struct sup_pagetable_entry, elem);
     struct sup_pagetable_entry * existed_pagetable_entry = sup_lookup(sup_pagetable, upage);
     ASSERT (existed_pagetable_entry != NULL);
     hash_delete(sup_pagetable, &existed_pagetable_entry->elem);
@@ -94,23 +85,17 @@ sup_pagetable_clear_page (struct hash * sup_pagetable, void* upage)
 
 struct sup_pagetable_entry *
 sup_lookup(struct hash * sup_pagetable, void* upage){
+
     ASSERT (sup_pagetable != NULL);
-    //printf("sup_lookup start\n");
-    //struct hash * sup_pagetable = thread_current()->sup_pagetable;
-    //printf("sup_lookup second\n");
+
     struct sup_pagetable_entry * temp_sup_entry = (struct sup_pagetable_entry *)malloc(sizeof(struct sup_pagetable_entry *));
-    //printf("sup_lookup mid1\n");
     temp_sup_entry->allocated_page = upage;
-    //printf("sup_lookup mid2\n");
-    //printf("hash_size %d\n", hash_size(sup_pagetable));
     struct hash_elem * find_elem = hash_find(sup_pagetable, &temp_sup_entry->elem);
     if (find_elem == NULL){
         free(temp_sup_entry);
-        //printf("loop up failed!\n");
         return NULL;
     }
     free(temp_sup_entry);
-    // printf("sup_lookup end\n");
     return hash_entry(find_elem, struct sup_pagetable_entry, elem);
 }
 
@@ -120,7 +105,6 @@ two functions about hash are quite similar to frame's
 unsigned
 sup_pagetable_hash_func (const struct hash_elem *e, void *aux UNUSED){
     struct sup_pagetable_entry *sup_entry = hash_entry (e, struct sup_pagetable_entry, elem);
-    //printf("hello\n");
     return hash_int((int)sup_entry->allocated_page);
 }
 

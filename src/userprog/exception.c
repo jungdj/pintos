@@ -170,58 +170,22 @@ page_fault (struct intr_frame *f)
    #ifdef VM
    struct thread * t = thread_current();
    void * esp = user ? f->esp : t->esp;
-   // printf("esp : %p\n", esp);
-   // if (!user){
-   //    printf("esp for kernel!! : %p\n\n", t->esp);
-   // }
-   /* 
-   가장 기본 경우의 수 stack grow인지 아닌지
-   터뜨려야하는 경우의 수
-   1. 사용자 주소에서 데이터를 기대할 수 없을때
-   2. 페이지가 커널 가상메모리 영역에 있을때, 
-   3. 읽기전용에 쓰려고 할때 -> 아직 고려 못함 g d
-   */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
    // printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      // printf("first if statement start\n");
-      // if (newpage != NULL){
-      //    printf("newpage complete \n");
-      // }
-      // struct frame_entry * frame_entry = lookup_frame(newpage);
-      // if (frame_entry == NULL){
-      //    printf("lookup_frame fail!!!!!! \n\n");
- 
-      // if(!sup_pagetable_clear_page(t->sup_pagetable, fault_page)){
-      //    printf("PANIC : clear page failed! \n");
-      // }
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
-      if (fault_entry){
-         // printf("NOT NULLLLLLL");
-         // printf("page_status : %d\n", fault_entry->status);
-         void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
+      void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
+
+      //swap-in case  
+      if (fault_entry != NULL){
          swap_in(fault_entry->swap_table_idx, new_frame);
-         pagedir_set_page(t->pagedir, fault_page, new_frame, true);
-         //sup_pagetable_set_page(t, fault_page, new_frame);
-      }else{
-         //just stack growth
-         void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
-         pagedir_set_page(t->pagedir, fault_page, new_frame, true);
       }
-      // printf("pagedir_set_page 1 for true, 0 for false : %d \n", asdf);
-      //pagedir_set_accessed(t->pagedir, new_frame, true);
-      // printf("first if statement end\n");      
+      pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+      pagedir_set_accessed(t->pagedir, new_frame, true);
       return; 
-      /* not yet implemented */
-      /*
-         User stack에 추가
-         하나 추가할때마다 f->esp = f->esp  - PGSIZE 
-         restart process
-      */
-      
    }
 
    /* valid region에 있다면 --> 정보가 없는 경우*/
@@ -231,25 +195,16 @@ page_fault (struct intr_frame *f)
       /* data loading in sup table*/
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
       if (fault_entry == NULL){
-         printf("No sup_entry Error\n");
+         //printf("No sup_entry Error\n");
          exit(-1);
       }
 
       void* new_frame = allocate_new_frame(0, fault_page);
-      /*memcpy해서 데이터 가져오기, swap table 고치기*/
       swap_in(fault_entry->swap_table_idx, new_frame);
-
-      // /*sup page-entry 최신화*/
-      // if(!sup_pagetable_clear_page(t->sup_pagedir, fault_page)){
-      //    printf("PANIC : clear page failed! \n");
-      // }
-      // if(!sup_pagetable_set_page(t, fault_page, new_frame)){
-      //    printf("PANIC : set page failed! \n");
-      // }
 
       /*pagedir 최신화*/
       pagedir_set_page(t->pagedir, fault_page, new_frame, true);
-      //pagedir_set_accessed(t->pagedir, new_frame, true);
+      pagedir_set_accessed(t->pagedir, new_frame, true);
       return;
    }
  

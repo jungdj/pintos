@@ -80,18 +80,6 @@ page를 free하고 frame table에서도 제거
 */
 void
 deallocate_frame(void * kpage){
-    // /*find frame entry corresponding kapge*/
-    // struct frame_entry * temp_frame_entry = (struct frame_entry *)malloc(sizeof(struct frame_entry));
-    // ASSERT(temp_frame_entry != NULL);
-    // temp_frame_entry->physical_memory = kpage;
-    // struct hash_elem * existed_elem = hash_find(&frame_hash, &temp_frame_entry->helem);
-    // free(temp_frame_entry);
-
-    // /*if no entry matched, failed*/
-    // ASSERT(existed_elem == NULL);
-
-    // struct frame_entry * existed_frame_entry = hash_entry(existed_elem, struct frame_entry, helem);
-
     struct frame_entry * existed_frame_entry = lookup_frame(kpage);    
     /*pop list, hash*/
     lock_acquire(&frame_lock);
@@ -246,22 +234,3 @@ frame_less_func (const struct hash_elem *a,
     struct frame_entry *b_entry = hash_entry(b, struct frame_entry, helem);
     return a_entry->physical_memory < b_entry->physical_memory;
 }
-
-// struct frame_entry *
-// iter_to_frame_entry(struct hash_iterator *i){
-//     ASSERT(i!= NULL);
-//     //printf("iter_to_frame_entry start\n");
-//     return hash_entry(hash_cur(i), struct frame_entry, helem);
-// }
-
-// /*if accessed = true, else false*/
-// bool
-// iter_check_accessed(struct hash_iterator *i){
-//     //printf("iter_check_accessed \n");
-//     struct frame_entry * iter_entry = iter_to_frame_entry(i);
-//     ASSERT(iter_entry != NULL);
-//     ASSERT(iter_entry->physical_memory != NULL);
-//     ASSERT(iter_entry->allocated_page != NULL);
-//     ASSERT(iter_entry->t != NULL);
-//     return pagedir_is_accessed(iter_entry->t->pagedir, iter_entry->physical_memory);
-// }
