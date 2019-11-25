@@ -17,13 +17,13 @@ static void halt (void);
 static int exec (const char *cmd_line);
 static int wait (int pid);
 static bool create (const char *filename, unsigned initial_size);
-//static bool remove (const char *file);
+static bool remove (const char *file);
 static int open (const char *file);
 static int filesize (int fd);
 static int read (int fd, void *buffer, unsigned length);
 static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
-//static unsigned tell (int fd);
+static unsigned tell (int fd);
 static void close (int fd);
 
 struct semaphore filesys_sema;
@@ -127,7 +127,9 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_REMOVE:
 //      printf ("syscall REMOVE called\n");
-
+      read_argument (&(f->esp), args, 1);
+      is_valid_arg(args[0], sizeof (char *));
+      f->eax = remove ((char *) *(uint32_t *) args[0]);
       break;
     case SYS_OPEN:
       read_argument (&(f->esp), args, 1);
@@ -157,7 +159,8 @@ syscall_handler(struct intr_frame *f) {
       break;
     case SYS_TELL:
 //      printf ("syscall TELL called\n");
-
+      read_argument (&(f->esp), args, 1);
+      f->eax = tell (*(int *) args[0]);
       break;
     case SYS_CLOSE:
 //      printf ("syscall CLOSE called\n");
@@ -261,6 +264,16 @@ write (int fd, const void *buffer, unsigned size)
   }
 }
 
+static bool
+remove(const char *file_name)
+{
+  bool success;
+  sema_down(&filesys_sema);
+  success = filesys_remove(file_name);
+  sema_up(&filesys_sema);
+  return success;
+}
+
 static int
 open (const char *file_name)
 {
@@ -329,6 +342,17 @@ filesize (int fd)
   sema_up (&filesys_sema);
 
   return result;
+}
+
+static unsigned 
+tell (int fd)
+{
+  int result;
+  sema_down (&filesys_sema);
+  struct file_descriptor *fd_info = find_fd (fd);
+  result = file_tell(fd_info->file);
+  sema_up (&filesys_sema);
+  return result; 
 }
 
 static void
