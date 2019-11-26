@@ -199,17 +199,21 @@ page_fault (struct intr_frame *f)
       //    printf("PANIC : clear page failed! \n");
       // }
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
-      if (fault_entry){
+      if (fault_entry!=NULL){
          // printf("NOT NULLLLLLL");
          // printf("page_status : %d\n", fault_entry->status);
          void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
          swap_in(fault_entry->swap_table_idx, new_frame);
          pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+         fault_entry -> status = ON_FRAME;
+         fault_entry -> physical_memory = new_frame;
          //sup_pagetable_set_page(t, fault_page, new_frame);
       }else{
          //just stack growth
          void * new_frame = allocate_new_frame(PAL_ZERO, fault_page);
          pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+         fault_entry -> status = ON_FRAME;
+         fault_entry -> physical_memory = new_frame;
       }
       // printf("pagedir_set_page 1 for true, 0 for false : %d \n", asdf);
       //pagedir_set_accessed(t->pagedir, new_frame, true);
@@ -239,7 +243,6 @@ page_fault (struct intr_frame *f)
       if (fault_entry->status == SWAPPED){
           /*memcpy해서 데이터 가져오기, swap table 고치기*/
           swap_in(fault_entry->swap_table_idx, new_frame);
-
           // /*sup page-entry 최신화*/
           // if(!sup_pagetable_clear_page(t->sup_pagedir, fault_page)){
           //    printf("PANIC : clear page failed! \n");
@@ -250,6 +253,8 @@ page_fault (struct intr_frame *f)
 
           /*pagedir 최신화*/
           pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+          fault_entry -> status = ON_FRAME;
+          fault_entry -> physical_memory = new_frame;
           //pagedir_set_accessed(t->pagedir, new_frame, true);
           return;
       }

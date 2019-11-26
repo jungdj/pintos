@@ -1,4 +1,5 @@
 #include "lib/kernel/hash.h"
+#include "filesys/off_t.h"
 /* about supplementary(sub) table & table entry
 they are all per-process resources
 */
