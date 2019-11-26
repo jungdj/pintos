@@ -236,20 +236,25 @@ page_fault (struct intr_frame *f)
       }
 
       void* new_frame = allocate_new_frame(0, fault_page);
-      /*memcpy해서 데이터 가져오기, swap table 고치기*/
-      swap_in(fault_entry->swap_table_idx, new_frame);
+      if (fault_entry->status == SWAPPED){
+          /*memcpy해서 데이터 가져오기, swap table 고치기*/
+          swap_in(fault_entry->swap_table_idx, new_frame);
 
-      // /*sup page-entry 최신화*/
-      // if(!sup_pagetable_clear_page(t->sup_pagedir, fault_page)){
-      //    printf("PANIC : clear page failed! \n");
-      // }
-      // if(!sup_pagetable_set_page(t, fault_page, new_frame)){
-      //    printf("PANIC : set page failed! \n");
-      // }
+          // /*sup page-entry 최신화*/
+          // if(!sup_pagetable_clear_page(t->sup_pagedir, fault_page)){
+          //    printf("PANIC : clear page failed! \n");
+          // }
+          // if(!sup_pagetable_set_page(t, fault_page, new_frame)){
+          //    printf("PANIC : set page failed! \n");
+          // }
 
-      /*pagedir 최신화*/
-      pagedir_set_page(t->pagedir, fault_page, new_frame, true);
-      //pagedir_set_accessed(t->pagedir, new_frame, true);
+          /*pagedir 최신화*/
+          pagedir_set_page(t->pagedir, fault_page, new_frame, true);
+          //pagedir_set_accessed(t->pagedir, new_frame, true);
+          return;
+      }
+      printf("fault_entry: %d\n", fault_entry->status);
+      printf("unreach able case\n");
       return;
    }
  

@@ -22,6 +22,13 @@ struct sup_pagetable_entry
     void * physical_memory;
 
     size_t swap_table_idx; /*if SWAPPED, index of sawp table that data saved*/
+
+    /*component for load segments*/
+    struct file *file;
+    size_t page_read_bytes;
+    size_t page_zero_bytes;
+    off_t ofs;
+    bool writable;
 };
 
 void sup_pagetable_create(struct thread *t);
