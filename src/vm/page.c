@@ -277,3 +277,53 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
     return false;
   }
 }
+
+void sup_page_unmap(void* upage, off_t i, int size){
+  /*
+  해당하는 sup_page_table_entry 찾음
+  만약에 entry->status가
+  ALL_ZERO => 그럴 리 없음
+  SWAP => dirty bit 체크 후 수정 되어있으면 옮기고 삭제
+  수정 안되어있으면 그냥 삭제
+  Filesys => 그냥 삭제 --> 아직 로딩 안되어있음
+  
+  on_frame이면 
+
+  dirty는 사용안함
+  accessed도 사용 안함
+  */
+  //TODO control dirty bit!!
+  //writable 생각해야함
+  struct thread *t = thread_current();
+  struct sup_page_table_entry * spte = sup_page_table_get_entry(t->spt, upage);
+  if (spte == NULL){
+    printf("PANIC sup_page_unmap no such spte!\n");
+    return;
+  }
+  //case on_frame dirty control이 있어야함,
+  if(spte->on_frame){
+    /*
+    dirty bit가 true면
+      frame의 정보를 file_write_at 으로 작성해준다.
+    결과 유무와 상관없이 frame을 free 시키고
+    pagedir에서 frame을 삭제한다.(clear)
+    당연히 sup_page도 삭제한다.
+    */
+  }else if(spte->source == SWAP){
+    /* 
+    dirty bit가 true면
+      swap의 정보를 file_write_at 으로 작성해준다.
+      ???
+    dirty bit가 false면
+      swap을 free 시킨다.
+      결과 유무와 상관없이 frame을 free 시키고
+    결과 유무와 상관없이 sup_page도 삭제한다.
+    */
+  }else if(spte->source == FILE_SYS){
+    // 아직 로딩 안한 거니까
+    // sup_page 만 삭제한다.
+  }else{
+    print("PANIC. NO case remain\n");
+    return;
+  }
+}

@@ -182,33 +182,64 @@ free_fds ()
   sema_up_filesys ();
 }
 
-// void
-// free_mmap_all()
-// {
-//   struct thread *t = thread_current ();
-//   struct list_elem *e;
-//   struct map_desc * mdesc;
+void
+free_mmap_all()
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct map_desc * mdesc;
 
-//   sema_down_filesys ();
-//   while(!list_empty(&t->map_list)) {
-//     e = list_pop_front(&t->map_list);
-//     mdesc = list_entry (e, struct map_desc, elem);
-//     free_mmap_element ();
-//     // free (mdesc->file);
-//   }
-//   sema_up_filesys ();
-// }
+  while(!list_empty(&t->map_list)) {
+    e = list_pop_front(&t->map_list);
+    mdesc = list_entry (e, struct map_desc, elem);
+    free_mmap_one (mdesc->id);
+  }
+}
 
-// void
-// free_mmap_one()
-// {
-//   /*mapid를 input으로 받아서
-//   map가 속한 모든 page에 대하여
-//   해당하는 sup page를 날리고
-//   해당하는 
-//   file을 free시킨다.
-//   */
-// }
+bool
+free_mmap_one(mapid_t mapid)
+{
+  struct map_desc * mdesc = find_map_desc(mapid);
+  if (mdesc == NULL){
+    return false;
+  }
+  void * page_start;
+  size_t written_size;
+  sema_down_filesys();
+  for(int i = 0; i<mdesc->size; i=i+PGSIZE){
+    page_start = mdesc->address + i;
+    written_size = (mdesc->size - i > PGSIZE ? PGSIZE : mdesc->size - i);
+    sup_page_unmap(page_start, i, written_size);
+  }
+  sema_up_filesys();
+  list_remove(&mdesc->elem);
+  file_close(mdesc->file);
+  free(mdesc);
+  /*mapid를 input으로 받아서
+  map가 속한 모든 page에 대하여
+  해당하는 sup page를 날리고
+  해당하는 
+  file을 free시킨다.
+  */
+}
+
+struct map_desc *
+find_map_desc (mapid_t mapid)
+{
+  struct thread *t = thread_current ();
+  struct list_elem *e;
+  struct map_desc *mdesc;
+
+  for (e = list_begin (&t->map_list); e != list_end (&t->map_list); e = e->next)
+  {
+    mdesc = list_entry (e, struct map_desc, elem);
+    if (mdesc->id == mapid) {
+      return mdesc;
+    }
+  }
+
+  return NULL;
+}
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -484,6 +515,7 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   free_fds ();
+  free_mmap_all();
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;

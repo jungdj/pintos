@@ -152,7 +152,8 @@ void pcb_update_status (int status);
 void pcb_wait_sema_up (void);
 void pcb_p_loaded_sema_up (void);
 void free_pcb (int pid);
-// void free_mmap_list();
+void free_mmap_all();
+bool free_mmap_one(mapid_t mapid);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -162,6 +163,8 @@ extern bool thread_mlfqs;
 struct thread* find_thread (int tid);
 struct file_descriptor * find_fd (int fd);
 struct file * find_file (int fd);
+
+struct map_desc * find_map_desc (mapid_t fd);
 
 void thread_init (void);
 void thread_start (void);
