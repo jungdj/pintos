@@ -12,6 +12,8 @@
 #include "pagedir.h"
 #include "process.h"
 
+#include "vm/page.h"
+
 static void syscall_handler (struct intr_frame *);
 static void halt (void);
 static int exec (const char *cmd_line);
@@ -25,10 +27,14 @@ static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
 //static unsigned tell (int fd);
 static void close (int fd);
+static mapid_t mmap (int fd, void* upage);
+static void munmap(mapid_t mapid);
+
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
 
 struct semaphore filesys_sema;
+int global_mapid=0;
 
 void sema_up_filesys ()
 {
@@ -169,11 +175,14 @@ syscall_handler(struct intr_frame *f) {
       /* Project 3 and optionally project 4. */
     case SYS_MMAP:
 //      printf ("syscall MMAP called\n");
-
+      read_argument (&(f->esp), args, 2);
+      //is_valid_arg(args[1], sizeof (void *)); why???
+      f->eax = mmap (*(int*)args[0], (void*) *(uint32_t *) args[1]);
       break;
     case SYS_MUNMAP:
 //      printf ("syscall MUNMAP called\n");
-
+      // read_argument (&(f->esp), args, 1);
+      // munmap(*(mapid_t*) args[0]);
       break;
 
       /* Project 4 only. */
@@ -359,6 +368,63 @@ close (int fd)
   }
   sema_up (&filesys_sema);
 }
+
+
+static mapid_t 
+mmap (int fd, void* upage)
+{
+  sema_down(&filesys_sema);
+  if (fd == 0 || fd == 1){
+    goto fail;
+  }
+  if (upage == NULL || pg_ofs(upage) != 0){ 
+    goto fail;
+  }
+  /*
+  file을 열어야 함
+  frame을 할당받아 mapping을 해야하고 -> 이제 ON_DISK case가 생김
+  mmapdesc를 만들어서 리스트에 추가해야함
+  */
+  struct file * pre_file = find_file(fd);
+  if (pre_file == NULL) goto fail;
+  struct file * new_file = file_reopen(pre_file);
+  int file_size = file_length(new_file);
+  if (file_size == 0) goto fail;
+
+  //check sup page entry
+  struct thread *t = thread_current();
+  for(int i=0; i<file_size; i=i+PGSIZE){
+    if(sup_page_table_has_entry(t->spt, (upage+i))) goto fail;
+  }
+  
+  //sup page make 이제부터 fail case가 없음
+  for(int offset=0; offset<file_size; offset=offset+PGSIZE){
+    size_t page_read_bytes = file_size-offset>PGSIZE ? PGSIZE : file_size-offset;
+    size_t page_zero_bytes = PGSIZE-page_read_bytes;
+    sup_page_reserve_segment(upage, new_file, offset, page_read_bytes, page_zero_bytes, true);
+  }
+  
+  //check finish. make map_desc
+  struct map_desc * mdesc = malloc(sizeof (struct map_desc));
+  mdesc->id = global_mapid++;
+  mdesc->address = upage;
+  mdesc->file = new_file;
+  mdesc->size = file_size;
+  list_push_back(&t->map_list, &mdesc->elem);
+
+  sema_up(&filesys_sema);
+  return mdesc->id;
+
+  fail:
+    sema_up(&filesys_sema);
+    return -1;
+}
+static void
+munmap(mapid_t mapid)
+{
+
+}
+
 
 void
 load_and_pin_buffer (const void *buffer, unsigned length)

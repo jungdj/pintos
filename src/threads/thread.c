@@ -182,7 +182,33 @@ free_fds ()
   sema_up_filesys ();
 }
 
+// void
+// free_mmap_all()
+// {
+//   struct thread *t = thread_current ();
+//   struct list_elem *e;
+//   struct map_desc * mdesc;
 
+//   sema_down_filesys ();
+//   while(!list_empty(&t->map_list)) {
+//     e = list_pop_front(&t->map_list);
+//     mdesc = list_entry (e, struct map_desc, elem);
+//     free_mmap_element ();
+//     // free (mdesc->file);
+//   }
+//   sema_up_filesys ();
+// }
+
+// void
+// free_mmap_one()
+// {
+//   /*mapid를 input으로 받아서
+//   map가 속한 모든 page에 대하여
+//   해당하는 sup page를 날리고
+//   해당하는 
+//   file을 free시킨다.
+//   */
+// }
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -632,6 +658,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   list_init (&t->fds);
+#ifdef VM
+  list_init (&t->map_list);
+#endif
   t->cur_fd = 2;
 
   t->exit_status = -1;

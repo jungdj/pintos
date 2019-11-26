@@ -117,11 +117,21 @@ struct thread
     uint8_t *esp;
 #ifdef VM
     struct hash *spt;
+    struct list map_list;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+typedef int mapid_t;
+struct map_desc {
+    mapid_t id; //id
+    void * address; //address mapped
+    struct file * file; //mapped file
+    int size;
+    struct list_elem elem;
+};
 
 struct pcb {
     int ppid;
@@ -142,6 +152,7 @@ void pcb_update_status (int status);
 void pcb_wait_sema_up (void);
 void pcb_p_loaded_sema_up (void);
 void free_pcb (int pid);
+// void free_mmap_list();
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

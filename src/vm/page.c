@@ -112,7 +112,7 @@ sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_
   spte->accessed = false;
   // TODO: Access time
 
-  printf("Reserve segment %x %x\n", (int *)upage, (int *) offset);
+//  printf("Reserve segment %x %x\n", (int *)upage, (int *) offset);
   spte->source = FILE_SYS;
   spte->file = file;
   spte->file_offset = offset;
