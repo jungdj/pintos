@@ -25,6 +25,7 @@ static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
 //static unsigned tell (int fd);
 static void close (int fd);
+static void check_pd (const void *uaddr);
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
 
@@ -258,6 +259,7 @@ write (int fd, const void *buffer, unsigned size)
 
     if (file != NULL){
 #ifdef VM
+      check_pd (buffer);
       load_and_pin_buffer (buffer, size);
 #endif
       result = file_write (file, buffer, size);
@@ -358,6 +360,17 @@ close (int fd)
     free (fd_info);
   }
   sema_up (&filesys_sema);
+}
+
+static void check_pd (const void *uaddr)
+{
+  void *upage;
+  uint32_t *pd = thread_current()->pagedir;
+  upage = pg_round_down (uaddr);
+  if (pagedir_get_page (pd, upage) == NULL)
+  {
+    exit (-1);
+  }
 }
 
 void
