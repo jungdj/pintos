@@ -115,10 +115,14 @@ sup_lookup(struct hash * sup_pagetable, void* upage){
     return hash_entry(find_elem, struct sup_pagetable_entry, elem);
 }
 
-/*upage mapped before this function, save other data in sup_entry*/
+/*
+locate after set page
+upage mapped before this function, save other data in sup_entry
+*/
 void
-sup_save_segment(struct sup_pagetable_entry * sup_entry, struct file *file, 
+sup_save_segment(struct thread *t, void* upage, struct file *file, 
     size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable){
+    struct sup_pagetable_entry * sup_entry = sup_lookup(t->sup_pagetable, upage);
     sup_entry -> file = file;
     sup_entry -> page_read_bytes = page_read_bytes;
     sup_entry -> page_zero_bytes = page_zero_bytes;
@@ -133,6 +137,7 @@ sup_load_segment(struct sup_pagetable_entry * sup_entry, void * upage, void * kp
     size_t page_zero_bytes = sup_entry->page_zero_bytes;
     off_t ofs = sup_entry->ofs;
     bool writable = sup_entry->writable;
+    file_seek (file, ofs);
     if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           deallocate_frame(kpage);
@@ -142,8 +147,10 @@ sup_load_segment(struct sup_pagetable_entry * sup_entry, void * upage, void * kp
 
     /* Run without set sup_pagetable */
     struct thread *t = thread_current();
-    if (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable)){
+
+    bool success = pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable);
+    if (!success){
         deallocate_frame(kpage);
         return false; 
     }

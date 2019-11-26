@@ -161,11 +161,11 @@ page_fault (struct intr_frame *f)
       body, and replace it with code that brings in the page to
       which fault_addr refers. */
    
-   // printf ("Page fault at %p: %s error %s page in %s context.\n",
-   //          fault_addr,
-   //          not_present ? "not present" : "rights violation",
-   //          write ? "writing" : "reading",
-   //          user ? "user" : "kernel");
+   printf ("Page fault at %p: %s error %s page in %s context.\n",
+            fault_addr,
+            not_present ? "not present" : "rights violation",
+            write ? "writing" : "reading",
+            user ? "user" : "kernel");
    
    #ifdef VM
    struct thread * t = thread_current();
@@ -183,11 +183,11 @@ page_fault (struct intr_frame *f)
    */
 
    void* fault_page = (void*) pg_round_down(fault_addr);
-   //printf("excpetion start\n");
+   printf("excpetion start\n");
    
    /* valid는 아니지만 growable region이라면 */
    if(is_stack_growth(f, fault_addr, esp)){
-      // printf("first if statement start\n");
+      printf("first if statement start\n");
       // if (newpage != NULL){
       //    printf("newpage complete \n");
       // }
@@ -230,7 +230,7 @@ page_fault (struct intr_frame *f)
 
    /* valid region에 있다면 --> 정보가 없는 경우*/
    else if (fault_addr != NULL && is_user_vaddr(fault_addr) && not_present){
-      // printf("second if statement\n");
+      printf("second if statement\n");
       
       /* data loading in sup table*/
       struct sup_pagetable_entry * fault_entry = sup_lookup(t->sup_pagetable, fault_page);
@@ -258,8 +258,12 @@ page_fault (struct intr_frame *f)
           //pagedir_set_accessed(t->pagedir, new_frame, true);
           return;
       }else if(fault_entry->status == ON_DISK){
-          /*add function*/
+          /*load_segment do all thing of this case*/
+          // printf("1\n\n");
           sup_load_segment(fault_entry, fault_page, new_frame);
+          // printf("is success? %d\n", success);
+          // printf("2\n\n");
+          return;
       }
       printf("fault_entry: %d\n", fault_entry->status);
       printf("unreach able case\n");
@@ -274,10 +278,11 @@ page_fault (struct intr_frame *f)
 
 bool  
 is_stack_growth(struct intr_frame *f, void* fault_addr, void* esp){
-   //printf("start is_stack_grow\n");
+   printf("start is_stack_grow\n");
    if(!is_user_vaddr(fault_addr) || (esp - fault_addr) > 32 || fault_addr < 0x08048000){
       exit(-1);
    }
+   printf("can grow stack\n");
    if (LOADER_PHYS_BASE - (unsigned)fault_addr <= 8<<20){
       return true;
    }

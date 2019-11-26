@@ -347,7 +347,6 @@ load (const char *args, void (**eip) (void), void **esp)
                   read_bytes = 0;
                   zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
                 }
-                //printf("before load segment\n\n");
               if (!load_segment (file, file_page, (void *) mem_page,
                                  read_bytes, zero_bytes, writable))
                 goto done;
@@ -453,6 +452,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
+    #ifdef VM
+      struct thread *t = thread_current();
+      sup_pagetable_set_page(t, upage, NULL, ON_DISK);
+      sup_save_segment(t, upage, file, page_read_bytes, page_zero_bytes, ofs, writable);
+    #else
       /* Get a page of memory. */
       uint8_t *kpage = allocate_new_frame (PAL_USER, upage);
       if (kpage == NULL){
@@ -476,10 +480,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           //palloc_free_page (kpage);
           return false; 
         }
+    #endif
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+    #ifdef VM
+      ofs += PGSIZE;
+    #endif
     }
   
   return true;
