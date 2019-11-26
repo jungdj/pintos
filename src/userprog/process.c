@@ -549,5 +549,5 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable)
-          && sup_pagetable_set_page(t, upage, kpage));
+          && sup_pagetable_set_page(t, upage, kpage, ON_FRAME));
 }

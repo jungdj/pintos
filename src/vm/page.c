@@ -1,10 +1,11 @@
 #include "debug.h"
+#include <stdio.h>
 #include "threads/thread.h"
 #include "threads/malloc.h"
 #include "page.h"
 #include "vm/swap.h"
 #include "lib/kernel/hash.h"
-#include <stdio.h>
+#include "filesys/file.h"
 
 /* about supplementary page*/
 
@@ -46,11 +47,11 @@ sup_pagetable에 한 page set에(one entry) 대한 정보 추가.
 upage가 
 */
 bool
-sup_pagetable_set_page(struct thread *t, void* upage, void* ppage){
+sup_pagetable_set_page(struct thread *t, void* upage, void* ppage, enum page_status status){
     struct sup_pagetable_entry * sup_entry = (struct sup_pagetable_entry *)malloc(sizeof(struct sup_pagetable_entry));
     ASSERT (sup_entry != NULL);
 
-    sup_entry->status = ON_FRAME;
+    sup_entry->status = status;
     sup_entry->allocated_page = upage;
     sup_entry->physical_memory = ppage;
     sup_entry->swap_table_idx = NULL;
@@ -112,6 +113,43 @@ sup_lookup(struct hash * sup_pagetable, void* upage){
     free(temp_sup_entry);
     // printf("sup_lookup end\n");
     return hash_entry(find_elem, struct sup_pagetable_entry, elem);
+}
+
+/*upage mapped before this function, save other data in sup_entry*/
+void
+sup_save_segment(struct sup_pagetable_entry * sup_entry, struct file *file, 
+    size_t page_read_bytes, size_t page_zero_bytes, off_t ofs, bool writable){
+    sup_entry -> file = file;
+    sup_entry -> page_read_bytes = page_read_bytes;
+    sup_entry -> page_zero_bytes = page_zero_bytes;
+    sup_entry -> ofs = ofs;
+    sup_entry -> writable = writable;
+}
+
+bool
+sup_load_segment(struct sup_pagetable_entry * sup_entry, void * upage, void * kpage){
+    struct file *file = sup_entry->file;
+    size_t page_read_bytes = sup_entry->page_read_bytes;
+    size_t page_zero_bytes = sup_entry->page_zero_bytes;
+    off_t ofs = sup_entry->ofs;
+    bool writable = sup_entry->writable;
+    if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
+        {
+          deallocate_frame(kpage);
+          return false; 
+        }
+    memset (kpage + page_read_bytes, 0, page_zero_bytes);
+
+    /* Run without set sup_pagetable */
+    struct thread *t = thread_current();
+    if (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable)){
+        deallocate_frame(kpage);
+        return false; 
+    }
+    sup_entry -> status = ON_FRAME;
+    sup_entry -> physical_memory = kpage;
+    return true;
 }
 
 /*

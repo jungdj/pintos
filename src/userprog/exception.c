@@ -257,6 +257,9 @@ page_fault (struct intr_frame *f)
           fault_entry -> physical_memory = new_frame;
           //pagedir_set_accessed(t->pagedir, new_frame, true);
           return;
+      }else if(fault_entry->status == ON_DISK){
+          /*add function*/
+          sup_load_segment(fault_entry, fault_page, new_frame);
       }
       printf("fault_entry: %d\n", fault_entry->status);
       printf("unreach able case\n");
