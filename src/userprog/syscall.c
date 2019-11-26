@@ -305,12 +305,20 @@ read (int fd, void *buffer, unsigned length)
 {
   int result = -1;
   struct file *file;
+  char tmp;
   sema_down (&filesys_sema);
   file = find_file(fd);
 
   if (file != NULL){
 #ifdef VM
-    load_and_pin_buffer (buffer, length);
+    tmp = *(char *)buffer;
+    if (tmp)
+    {
+      load_and_pin_buffer (buffer, length);
+    }
+    else {
+      load_and_pin_buffer (buffer, length);
+    }
 #endif
     result = file_read (file, buffer, length);
 #ifdef VM
