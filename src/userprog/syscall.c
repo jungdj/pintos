@@ -180,9 +180,8 @@ syscall_handler(struct intr_frame *f) {
       f->eax = mmap (*(int*)args[0], (void*) *(uint32_t *) args[1]);
       break;
     case SYS_MUNMAP:
-//      printf ("syscall MUNMAP called\n");
-      // read_argument (&(f->esp), args, 1);
-      // munmap(*(mapid_t*) args[0]);
+      read_argument (&(f->esp), args, 1);
+      munmap(*(mapid_t*) args[0]);
       break;
 
       /* Project 4 only. */
@@ -422,7 +421,7 @@ mmap (int fd, void* upage)
 static void
 munmap(mapid_t mapid)
 {
-
+  free_mmap_one(mapid);
 }
 
 

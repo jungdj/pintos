@@ -201,6 +201,7 @@ free_mmap_one(mapid_t mapid)
 {
   struct map_desc * mdesc = find_map_desc(mapid);
   if (mdesc == NULL){
+    printf("PANIC. can not find map_desc\n");
     return false;
   }
   void * page_start;

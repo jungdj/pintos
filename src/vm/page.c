@@ -1,3 +1,4 @@
+#include <lib/kernel/hash.h>
 #include <filesys/file.h>
 #include <string.h>
 #include "userprog/syscall.h"
@@ -278,7 +279,7 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   }
 }
 
-void sup_page_unmap(void* upage, off_t i, int size){
+void sup_page_unmap(void* upage, off_t file_ofs, int size){
   /*
   해당하는 sup_page_table_entry 찾음
   만약에 entry->status가
@@ -304,26 +305,49 @@ void sup_page_unmap(void* upage, off_t i, int size){
   if(spte->on_frame){
     /*
     dirty bit가 true면
-      frame의 정보를 file_write_at 으로 작성해준다.
+    frame의 정보를 file_write_at 으로 작성해준다.
     결과 유무와 상관없이 frame을 free 시키고
     pagedir에서 frame을 삭제한다.(clear)
     당연히 sup_page도 삭제한다.
     */
+    bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
+    if(dirty){
+      file_write_at(spte->file, upage, size, file_ofs);
+    }
+    free_frame(spte->kpage);
+    pagedir_clear_page(t->pagedir, upage);
+    hash_delete(t->spt,&spte->h_elem);
+    free(spte);
   }else if(spte->source == SWAP){
+    bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
+    if(dirty){
+      void * temp_page  = malloc(size);
+      swap_in(spte->swap_index, temp_page);
+      file_write_at(spte->file, temp_page, size, file_ofs);
+      free(temp_page);
+    }else{
+      free_swap_slot(spte->swap_index);
+    }
+    //on frame 상태가 아니잖아
+    // free_frame(spte->kpage);
+    // pagedir_clear_page(t->pagedir, upage);
+    hash_delete(t->spt,&spte->h_elem);
+    free(spte);
     /* 
     dirty bit가 true면
       swap의 정보를 file_write_at 으로 작성해준다.
       ???
     dirty bit가 false면
       swap을 free 시킨다.
-      결과 유무와 상관없이 frame을 free 시키고
     결과 유무와 상관없이 sup_page도 삭제한다.
     */
   }else if(spte->source == FILE_SYS){
+    hash_delete(t->spt,&spte->h_elem);
+    free(spte);
     // 아직 로딩 안한 거니까
     // sup_page 만 삭제한다.
   }else{
-    print("PANIC. NO case remain\n");
+    printf("PANIC. NO case remain\n");
     return;
   }
 }

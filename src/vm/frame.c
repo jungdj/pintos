@@ -69,7 +69,10 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
     spte = fte->spte;
     pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
-
+    //dirty check
+    if (pagedir_is_dirty(fte->owner->pagedir, fte->upage)){
+      spte->dirty = true; // true || spte->dirty --> true
+    }
     if (pagedir_is_dirty (fte->owner->pagedir, fte->upage) || spte->writable) {
       swap_index = swap_out (kpage);
       spte->source = SWAP;
