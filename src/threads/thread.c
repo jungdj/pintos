@@ -189,13 +189,16 @@ free_mmap_all()
   struct list_elem *e;
   struct map_desc * mdesc;
 
+  sema_down_filesys();
   while(!list_empty(&t->map_list)) {
     e = list_pop_front(&t->map_list);
     mdesc = list_entry (e, struct map_desc, elem);
     free_mmap_one (mdesc->id);
   }
+  sema_up_filesys();
 }
 
+//free one mmap with mapid
 bool
 free_mmap_one(mapid_t mapid)
 {
@@ -206,22 +209,14 @@ free_mmap_one(mapid_t mapid)
   }
   void * page_start;
   size_t written_size;
-  sema_down_filesys();
   for(int i = 0; i<mdesc->size; i=i+PGSIZE){
     page_start = mdesc->address + i;
     written_size = (mdesc->size - i > PGSIZE ? PGSIZE : mdesc->size - i);
     sup_page_unmap(page_start, i, written_size);
   }
-  sema_up_filesys();
   list_remove(&mdesc->elem);
   file_close(mdesc->file);
   free(mdesc);
-  /*mapid를 input으로 받아서
-  map가 속한 모든 page에 대하여
-  해당하는 sup page를 날리고
-  해당하는 
-  file을 free시킨다.
-  */
 }
 
 struct map_desc *
