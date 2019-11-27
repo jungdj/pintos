@@ -91,6 +91,6 @@ bool sup_page_load_page (void *upage);
 
 bool sup_page_update_frame_pinned (void *upage, bool pinned);
 
-void sup_page_unmap(void* upage, off_t i, int size);
+void sup_page_unmap(void* upage, int size, off_t file_ofs);
 
 #endif /* vm/page.h */

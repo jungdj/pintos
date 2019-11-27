@@ -279,22 +279,7 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   }
 }
 
-void sup_page_unmap(void* upage, off_t file_ofs, int size){
-  /*
-  해당하는 sup_page_table_entry 찾음
-  만약에 entry->status가
-  ALL_ZERO => 그럴 리 없음
-  SWAP => dirty bit 체크 후 수정 되어있으면 옮기고 삭제
-  수정 안되어있으면 그냥 삭제
-  Filesys => 그냥 삭제 --> 아직 로딩 안되어있음
-  
-  on_frame이면 
-
-  dirty는 사용안함
-  accessed도 사용 안함
-  */
-  //TODO control dirty bit!!
-  //writable 생각해야함
+void sup_page_unmap(void* upage, int size, off_t file_ofs){
   struct thread *t = thread_current();
   struct sup_page_table_entry * spte = sup_page_table_get_entry(t->spt, upage);
   if (spte == NULL){
@@ -312,7 +297,8 @@ void sup_page_unmap(void* upage, off_t file_ofs, int size){
     */
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
-      file_write_at(spte->file, upage, size, file_ofs);
+      printf("is it run?\n");
+      file_write_at(spte->file, spte->upage, size, file_ofs);
     }
     free_frame(spte->kpage);
     pagedir_clear_page(t->pagedir, upage);
@@ -321,7 +307,7 @@ void sup_page_unmap(void* upage, off_t file_ofs, int size){
   }else if(spte->source == SWAP){
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
-      void * temp_page  = malloc(size);
+      void * temp_page  = malloc(sizeof(upage));
       swap_in(spte->swap_index, temp_page);
       file_write_at(spte->file, temp_page, size, file_ofs);
       free(temp_page);

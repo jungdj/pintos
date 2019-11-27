@@ -209,10 +209,10 @@ free_mmap_one(mapid_t mapid)
   }
   void * page_start;
   size_t written_size;
-  for(int i = 0; i<mdesc->size; i=i+PGSIZE){
-    page_start = mdesc->address + i;
-    written_size = (mdesc->size - i > PGSIZE ? PGSIZE : mdesc->size - i);
-    sup_page_unmap(page_start, i, written_size);
+  for(int file_ofs = 0; file_ofs<mdesc->size; file_ofs=file_ofs+PGSIZE){
+    page_start = mdesc->address + file_ofs;
+    written_size = (mdesc->size - file_ofs > PGSIZE ? PGSIZE : mdesc->size - file_ofs);
+    sup_page_unmap(page_start, written_size, file_ofs);
   }
   list_remove(&mdesc->elem);
   file_close(mdesc->file);
