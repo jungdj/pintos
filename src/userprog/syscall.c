@@ -412,11 +412,7 @@ mmap (int fd, void* upage)
   if (upage == NULL || pg_ofs(upage) != 0){ 
     goto fail;
   }
-  /*
-  file을 열어야 함
-  frame을 할당받아 mapping을 해야하고 -> 이제 ON_DISK case가 생김
-  mmapdesc를 만들어서 리스트에 추가해야함
-  */
+  
   struct file * pre_file = find_file(fd);
   if (pre_file == NULL) goto fail;
   struct file * new_file = file_reopen(pre_file);
@@ -433,7 +429,7 @@ mmap (int fd, void* upage)
   for(int offset=0; offset<file_size; offset=offset+PGSIZE){
     size_t page_read_bytes = file_size-offset>PGSIZE ? PGSIZE : file_size-offset;
     size_t page_zero_bytes = PGSIZE-page_read_bytes;
-    sup_page_reserve_segment(upage, new_file, offset, page_read_bytes, page_zero_bytes, true);
+    sup_page_reserve_segment(upage+offset, new_file, offset, page_read_bytes, page_zero_bytes, true);
   }
   
   //check finish. make map_desc
