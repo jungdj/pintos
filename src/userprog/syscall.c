@@ -29,7 +29,7 @@ static void seek (int fd, unsigned position);
 static void close (int fd);
 static mapid_t mmap (int fd, void* upage);
 static void munmap(mapid_t mapid);
-
+static void check_pd (const void *uaddr);
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
 
@@ -266,6 +266,7 @@ write (int fd, const void *buffer, unsigned size)
 
     if (file != NULL){
 #ifdef VM
+      check_pd (buffer);
       load_and_pin_buffer (buffer, size);
 #endif
       result = file_write (file, buffer, size);
@@ -311,12 +312,20 @@ read (int fd, void *buffer, unsigned length)
 {
   int result = -1;
   struct file *file;
+  char tmp;
   sema_down (&filesys_sema);
   file = find_file(fd);
 
   if (file != NULL){
 #ifdef VM
-    load_and_pin_buffer (buffer, length);
+    tmp = *(char *)buffer;
+    if (tmp)
+    {
+      load_and_pin_buffer (buffer, length);
+    }
+    else {
+      load_and_pin_buffer (buffer, length);
+    }
 #endif
     result = file_read (file, buffer, length);
 #ifdef VM
@@ -367,7 +376,6 @@ close (int fd)
   }
   sema_up (&filesys_sema);
 }
-
 
 static mapid_t 
 mmap (int fd, void* upage)
@@ -424,6 +432,16 @@ munmap(mapid_t mapid)
   free_mmap_one(mapid);
 }
 
+static void check_pd (const void *uaddr)
+{
+  void *upage;
+  uint32_t *pd = thread_current()->pagedir;
+  upage = pg_round_down (uaddr);
+  if (pagedir_get_page (pd, upage) == NULL)
+  {
+    exit (-1);
+  }
+}
 
 void
 load_and_pin_buffer (const void *buffer, unsigned length)
