@@ -188,14 +188,13 @@ free_mmap_all()
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct map_desc * mdesc;
-
-  sema_down_filesys();
   while(!list_empty(&t->map_list)) {
-    e = list_pop_front(&t->map_list);
+    //pop in free_mmap_one
+    e = list_begin(&t->map_list);
     mdesc = list_entry (e, struct map_desc, elem);
-    free_mmap_one (mdesc->id);
-  }
-  sema_up_filesys();
+    free_mmap_one(mdesc->id);
+    break;
+  }  
 }
 
 //free one mmap with mapid
@@ -207,16 +206,20 @@ free_mmap_one(mapid_t mapid)
     printf("PANIC. can not find map_desc\n");
     return false;
   }
+  
   void * page_start;
   size_t written_size;
-  for(int file_ofs = 0; file_ofs<mdesc->size; file_ofs=file_ofs+PGSIZE){
+  for(int file_ofs = 0; file_ofs < (mdesc->size); file_ofs=file_ofs+PGSIZE){
+    // sema_down_filesys ();
     page_start = mdesc->address + file_ofs;
     written_size = (mdesc->size - file_ofs > PGSIZE ? PGSIZE : mdesc->size - file_ofs);
     sup_page_unmap(page_start, written_size, file_ofs);
+    // sema_up_filesys ();
   }
   list_remove(&mdesc->elem);
   file_close(mdesc->file);
   free(mdesc);
+  
 }
 
 struct map_desc *
@@ -225,15 +228,15 @@ find_map_desc (mapid_t mapid)
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct map_desc *mdesc;
-
   for (e = list_begin (&t->map_list); e != list_end (&t->map_list); e = e->next)
   {
     mdesc = list_entry (e, struct map_desc, elem);
+    // printf("%d, ", mdesc->id);
     if (mdesc->id == mapid) {
       return mdesc;
     }
   }
-
+  // printf("\n");
   return NULL;
 }
 
@@ -502,7 +505,9 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
-
+  
+  free_mmap_all();
+  
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -511,7 +516,6 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   free_fds ();
-  free_mmap_all();
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;

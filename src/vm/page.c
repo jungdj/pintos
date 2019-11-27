@@ -295,16 +295,19 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     pagedir에서 frame을 삭제한다.(clear)
     당연히 sup_page도 삭제한다.
     */
+    // fte_update_pinned(spte->kpage, true);
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
-      printf("is it run?\n");
+      // printf("is it run?\n");
       file_write_at(spte->file, spte->upage, size, file_ofs);
     }
     free_frame(spte->kpage);
     pagedir_clear_page(t->pagedir, upage);
     hash_delete(t->spt,&spte->h_elem);
-    free(spte);
+    // free(spte);
   }else if(spte->source == SWAP){
+    printf("case2\n");
+    
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
       void * temp_page  = malloc(sizeof(upage));
@@ -315,10 +318,9 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
       free_swap_slot(spte->swap_index);
     }
     //on frame 상태가 아니잖아
-    // free_frame(spte->kpage);
-    // pagedir_clear_page(t->pagedir, upage);
+
     hash_delete(t->spt,&spte->h_elem);
-    free(spte);
+    // free(spte);
     /* 
     dirty bit가 true면
       swap의 정보를 file_write_at 으로 작성해준다.
@@ -328,8 +330,10 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     결과 유무와 상관없이 sup_page도 삭제한다.
     */
   }else if(spte->source == FILE_SYS){
+    printf("case3\n");
+    
     hash_delete(t->spt,&spte->h_elem);
-    free(spte);
+    // free(spte);
     // 아직 로딩 안한 거니까
     // sup_page 만 삭제한다.
   }else{
