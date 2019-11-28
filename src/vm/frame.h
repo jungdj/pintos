@@ -26,4 +26,5 @@ void fte_install_spte (void *kpage, struct sup_page_table_entry *spte);
 void free_frame_with_lock (void *kpage);
 void free_frame (void *addr);
 void * select_victim_frame (void);
+static struct lock frame_table_lock;
 #endif /* vm/frame.h */

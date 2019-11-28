@@ -301,11 +301,10 @@ open (const char *file_name)
   struct file_descriptor *fd;
   struct file *file = NULL;
   int result = -1;
-
+  sema_down (&filesys_sema);
+  
   fd = (struct file_descriptor *) malloc (sizeof (struct file_descriptor));
   memset (fd, 0, sizeof (struct file_descriptor));
-
-  sema_down (&filesys_sema);
 
   file = filesys_open (file_name);
   if (file != NULL)
@@ -329,10 +328,10 @@ read (int fd, void *buffer, unsigned length)
   char tmp;
   sema_down (&filesys_sema);
   file = find_file(fd);
-
   if (file != NULL){
 #ifdef VM
     tmp = *(char *)buffer;
+
     if (tmp)
     {
       load_and_pin_buffer (buffer, length);

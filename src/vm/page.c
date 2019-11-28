@@ -178,19 +178,19 @@ sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new)
     }
     return false;
   }
-
   writable = spte->writable;
   if(spte->on_frame) {
     fte_update_pinned (spte->kpage, pinned);
-//    printf ("Dup load request.\n");
+    // printf ("Dup load request.\n");
     return true;
   }
-
+  // printf("error point start0\n");
   kpage = allocate_frame_and_pin (PAL_USER | PAL_ZERO, upage, pinned);
-
+  // printf("error point end0\n");
   if (kpage == NULL)
     return false;
 
+  
   switch (spte->source)
   {
     case FILE_SYS:
@@ -211,7 +211,7 @@ sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new)
       printf ("Unknown SPTE source %d\n", spte->source);
       return false;
   }
-
+  // printf("can get here?\n");
   if (!pagedir_set_page (pagedir, upage, kpage, writable))
   {
     free_frame (kpage);
@@ -293,10 +293,10 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     if(dirty){
       file_write_at(spte->file, spte->upage, size, file_ofs);
     }
-    free_frame(spte->kpage);
+    free_frame_with_lock(spte->kpage);
     pagedir_clear_page(t->pagedir, upage);
   }else if(spte->source == SWAP){
-    // printf("case2\n");
+    printf("case2\n");
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
       void * temp_page  = malloc(sizeof(upage));

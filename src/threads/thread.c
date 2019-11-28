@@ -188,13 +188,13 @@ free_mmap_all()
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct map_desc * mdesc;
-  sema_down_filesys();
+  
   while(!list_empty(&t->map_list)) {
     e = list_begin(&t->map_list);
     mdesc = list_entry (e, struct map_desc, elem);
     free_mmap_one(mdesc->id);
-  } 
-  sema_up_filesys(); 
+  }
+  
 }
 
 //free one mmap with mapid
@@ -501,7 +501,6 @@ thread_exit (void)
 {
   ASSERT (!intr_context ());
   
-  // free_mmap_all();
   
 #ifdef USERPROG
   process_exit ();
@@ -544,7 +543,6 @@ thread_foreach (thread_action_func *func, void *aux)
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
-
   for (e = list_begin (&all_list); e != list_end (&all_list);
        e = list_next (e))
     {

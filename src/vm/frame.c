@@ -10,7 +10,7 @@
 #include "vm/page.h"
 #include "vm/swap.h"
 
-static struct lock frame_table_lock;
+
 static struct hash frame_table;
 
 static unsigned
@@ -59,13 +59,16 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
   struct sup_page_table_entry *spte;
   struct frame_table_entry *fte;
   size_t swap_index;
-
+  // printf("Error point start0.5\n");
   lock_acquire (&frame_table_lock);
   kpage = palloc_get_page (flags);
+  // printf("Error point end0.5\n");
   // Allocation failed
   if (kpage == NULL) {
 #ifdef VM_SWAP_H
+    // printf("Error point start1\n");
     fte = select_victim_frame ();
+    // printf("Error point end1\n");
     spte = fte->spte;
     pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
@@ -84,7 +87,6 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
     return NULL;
 #endif
   }
-
   fte = malloc (sizeof (struct frame_table_entry));
   // TODO : Check validity ?
   fte->owner = thread_current ();
@@ -162,17 +164,20 @@ free_frame_with_lock (void *kpage)
 void *
 select_victim_frame (void)
 {
+  ASSERT(lock_held_by_current_thread(&frame_table_lock));
   static size_t victim_index = 0;
   size_t n;
   struct hash_iterator it;
   size_t i;
-
+  // printf("start %d=victim_index\n", victim_index);
   n = hash_size (&frame_table);
 
   hash_first (&it, &frame_table);
-  for(i = 0; i <= victim_index; ++i)
+  // printf("Error point start2\n");
+  for(i = 0; i <= victim_index; i++){
     hash_next (&it);
-
+  }
+  // printf("Error point end2\n");
   do {
     struct frame_table_entry *fte = hash_entry (hash_cur (&it), struct frame_table_entry, h_elem);
     victim_index = (victim_index + 1) % n;
@@ -182,10 +187,12 @@ select_victim_frame (void)
     }
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
   } while (hash_next (&it));
-
+  
+  // printf("Error point start3\n");
   hash_first (&it, &frame_table);
   hash_next (&it);
-
+  // printf("Error point end3\n");
+  
   do {
     struct frame_table_entry *fte = hash_entry(hash_cur (&it), struct frame_table_entry, h_elem);
     victim_index = (victim_index + 1) % n;
