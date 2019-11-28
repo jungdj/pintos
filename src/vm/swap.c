@@ -42,6 +42,7 @@ swap_init (void)
 bool 
 swap_in (size_t swap_index, void *page)
 {
+  lock_acquire(&swap_lock);
   ASSERT (bitmap_test(swap_table, swap_index));
 
   size_t i;
@@ -50,6 +51,7 @@ swap_in (size_t swap_index, void *page)
   }
 
   bitmap_set(swap_table, swap_index, false);
+  lock_release(&swap_lock);
 }
 
 /* 
@@ -69,6 +71,7 @@ swap_in (size_t swap_index, void *page)
 size_t
 swap_out (void *addr)
 {
+  lock_acquire(&swap_lock);
   // TODO: Validation?
   size_t swap_index;
   size_t i;
@@ -77,6 +80,7 @@ swap_out (void *addr)
     block_write (swap_block, swap_index * sectors_per_page + i, addr + (BLOCK_SECTOR_SIZE * i));
   }
   bitmap_set (swap_table, swap_index, true);
+  lock_release(&swap_lock);
   return swap_index;
 }
 
@@ -84,7 +88,9 @@ swap_out (void *addr)
 void
 free_swap_slot (size_t swap_index)
 {
-  bitmap_set (swap_table, swap_index, false);
+  lock_acquire(&swap_lock);
+  bitmap_set (swap_table, swap_index, true);
+  lock_release(&swap_lock);
 }
 
 

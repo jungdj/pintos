@@ -57,7 +57,6 @@ sup_page_table_get_entry (struct hash *sup_page_table, void *upage)
 {
   struct sup_page_table_entry tmp_spte;
   tmp_spte.upage = upage;
-
   struct hash_elem *elem = hash_find (sup_page_table, &tmp_spte.h_elem);
   if (elem == NULL) return NULL;
   return hash_entry (elem, struct sup_page_table_entry, h_elem);
@@ -287,15 +286,17 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     return;
   }
   //case on_frame dirty control이 있어야함,
+  // printf("case start :");
   if(spte->on_frame){
+    // printf("case1\n");
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
       file_write_at(spte->file, spte->upage, size, file_ofs);
     }
     free_frame(spte->kpage);
     pagedir_clear_page(t->pagedir, upage);
-    hash_delete(t->spt,&spte->h_elem);
   }else if(spte->source == SWAP){
+    // printf("case2\n");
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
       void * temp_page  = malloc(sizeof(upage));
@@ -305,11 +306,11 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     }else{
       free_swap_slot(spte->swap_index);
     }
-    hash_delete(t->spt,&spte->h_elem);
   }else if(spte->source == FILE_SYS){
-    hash_delete(t->spt,&spte->h_elem);
+    // printf("case3\n");
   }else{
     printf("PANIC. NO case remain\n");
-    return;
   }
+  // 여기도 에러를 만든다 
+  hash_delete(t->spt,&spte->h_elem);
 }

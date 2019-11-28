@@ -159,6 +159,7 @@ process_exit (void)
   pcb_wait_sema_up ();
 
 #ifdef VM
+  free_mmap_all();
   spt = cur->spt;
   if (spt != NULL)
   {

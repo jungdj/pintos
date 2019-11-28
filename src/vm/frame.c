@@ -69,14 +69,12 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
     spte = fte->spte;
     pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
-    //dirty check
-    if (pagedir_is_dirty(fte->owner->pagedir, fte->upage)){
-      spte->dirty = true; // true || spte->dirty --> true
-    }
+    // dirty check
     if (pagedir_is_dirty (fte->owner->pagedir, fte->upage) || spte->writable) {
       swap_index = swap_out (kpage);
       spte->source = SWAP;
       spte->swap_index = swap_index;
+      spte->dirty = true;
     } else {
       spte->source = FILE_SYS;
     };
@@ -146,19 +144,16 @@ free_frame_with_lock (void *kpage)
   tmp_fte = (struct frame_table_entry *) malloc (sizeof (struct frame_table_entry));
 
   tmp_fte->frame = (void *) vtop (kpage);
-
   struct hash_elem *h_elem = hash_find (&frame_table, &tmp_fte->h_elem);
-
   free (tmp_fte);
   if (h_elem == NULL) {
+    printf("PANIC can not find hash_elem\n");
     // TODO: Frame not found!? handle it
     return;
   }
 
   fte = hash_entry (h_elem, struct frame_table_entry, h_elem);
-
   hash_delete (&frame_table, &fte->h_elem);
-
 //  pagedir_clear_page (fte->owner->pagedir, fte->upage);
 //  palloc_free_page (fte->kpage);
   free (fte);
