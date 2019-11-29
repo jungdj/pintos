@@ -59,33 +59,37 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
   struct sup_page_table_entry *spte;
   struct frame_table_entry *fte;
   size_t swap_index;
-  // printf("Error point start0.5\n");
   lock_acquire (&frame_table_lock);
+  // printf("Error point start0.5\n");
   kpage = palloc_get_page (flags);
   // printf("Error point end0.5\n");
   // Allocation failed
   if (kpage == NULL) {
-#ifdef VM_SWAP_H
-    // printf("Error point start1\n");
+// #ifdef VM_SWAP_H
+    // printf("select victim_frame start\n");
     fte = select_victim_frame ();
-    // printf("Error point end1\n");
+    // printf("select victim_frame end\n");
     spte = fte->spte;
     pagedir_clear_page (fte->owner->pagedir, fte->upage);
     kpage = fte->kpage;
     // dirty check
     if (pagedir_is_dirty (fte->owner->pagedir, fte->upage) || spte->writable) {
+      // printf("Error point start6\n");
       swap_index = swap_out (kpage);
       spte->source = SWAP;
       spte->swap_index = swap_index;
       spte->dirty = true;
+      // printf("Error point end6\n");
     } else {
       spte->source = FILE_SYS;
     };
     spte->on_frame = false;
+    // printf("Error point start5\n");
     free_frame_with_lock (kpage);
-#else
-    return NULL;
-#endif
+    // printf("Error point end5\n");
+// #else
+//     return NULL;
+// #endif
   }
   fte = malloc (sizeof (struct frame_table_entry));
   // TODO : Check validity ?
@@ -95,24 +99,26 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
   fte->kpage = kpage; // TODO: vaddr?
   fte->upage = upage;
   fte->pinned = pinned;
-
+  // printf("Error point start 4\n");
   hash_insert (&frame_table, &fte->h_elem);
+  // printf("Error point end 4\n");
   lock_release (&frame_table_lock);
-
   return kpage;
 }
 
 void *
 allocate_frame (enum palloc_flags flags, void *upage)
 {
-  allocate_frame_and_pin (flags, upage, false);
+  return allocate_frame_and_pin (flags, upage, false);
 }
 
 void
 fte_update_pinned (void *kpage, bool pinned)
 {
+  lock_acquire(&frame_table_lock);
   struct frame_table_entry *fte = get_frame_table_entry (kpage);
   fte->pinned = pinned;
+  lock_release(&frame_table_lock);
 }
 
 void
@@ -174,6 +180,7 @@ select_victim_frame (void)
 
   hash_first (&it, &frame_table);
   // printf("Error point start2\n");
+  // printf("hash_size : %d, victim_index: %d\n", n, victim_index);
   for(i = 0; i <= victim_index; i++){
     hash_next (&it);
   }
@@ -202,4 +209,6 @@ select_victim_frame (void)
     }
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
   } while (hash_next(&it));
+  printf("PANIC: I dont know we can reach here?");
+  return NULL;
 }

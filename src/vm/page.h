@@ -10,34 +10,6 @@
 #include "threads/palloc.h"
 #include "vm/swap.h"
 
-/*
- * Do supplementary page tables need supplementary page dir table?
- * Maybe yes or maybe not.
- * As sup_pages don't need to be grouped as the same way pages are
- * grouped, supplementary page tables don't need sup_page_dir
-struct sup_pagedir_table
-{
-    struct hash sup_page_table;
-    struct lock sup_page_table_lock;
-};
-
-uint32_t * sup_pagedir_create (void);
-struct hash* sup_page_create (void);
-
-uint32_t *
-sup_pagedir_create (void)
-{
-  struct sup_pagedir_table *spdt = malloc (sizeof (struct sup_pagedir_table));
-  return spdt;
-}
-
-void
-sup_pagedir_destroy (void *pagedir)
-{
-  // TODO: destroy sup pagedir table
-}
-*/
-
 enum
 page_source
 {
@@ -74,6 +46,14 @@ struct sup_page_table_entry
   struct file * file;
   off_t file_offset;
   uint32_t file_page_read_bytes, file_page_zero_bytes;
+};
+
+struct map_desc {
+    int id; //id
+    void * address; //address mapped
+    struct file * file; //mapped file
+    int size;
+    struct list_elem elem;
 };
 
 struct hash* sup_page_create (void);

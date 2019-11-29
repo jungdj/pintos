@@ -124,7 +124,7 @@ sup_page_reserve_segment (void *upage, struct file * file, off_t offset, uint32_
   prev_elem = hash_insert (spt, &spte->h_elem);
   if (prev_elem == NULL) return true;
   // TODO: Unexpected dup entry? Need validation?
-  printf ("Duplicate entry when reserving new segment from file\n");
+  // printf ("Duplicate entry when reserving new segment from file\n");
   free (spte);
   return false;
 }
@@ -168,11 +168,13 @@ sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new)
   struct sup_page_table_entry *spte;
   void *kpage;
   bool writable;
-
+  
+  // printf("sup_page_load_page_and pin start\n");
   spte = sup_page_table_get_entry (spt, upage);
 
   if(spte == NULL) {
     if (create_new) {
+      // printf("")
       sup_page_install_zero_page(upage);
       return sup_page_load_page_and_pin (upage, pinned, false);
     }
@@ -184,9 +186,9 @@ sup_page_load_page_and_pin (void *upage, bool pinned, bool create_new)
     // printf ("Dup load request.\n");
     return true;
   }
-  // printf("error point start0\n");
+  // printf("allocate_frame_and_pin start\n");
   kpage = allocate_frame_and_pin (PAL_USER | PAL_ZERO, upage, pinned);
-  // printf("error point end0\n");
+  // printf("allocate_frame_and_pin end\n");
   if (kpage == NULL)
     return false;
 
@@ -263,6 +265,7 @@ sup_page_install_frame (struct hash *sup_page_table, void *upage, void *kpage)
   spte->on_frame = true;
   spte->dirty = false;
   spte->accessed = false;
+  spte->source = FILE_SYS;
 
   struct hash_elem *prev_elem;
 
@@ -291,12 +294,13 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
     // printf("case1\n");
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
+      sup_page_update_frame_pinned (upage, true);
       file_write_at(spte->file, spte->upage, size, file_ofs);
+      sup_page_update_frame_pinned (upage, false);
     }
-    free_frame_with_lock(spte->kpage);
+    free_frame(spte->kpage);
     pagedir_clear_page(t->pagedir, upage);
   }else if(spte->source == SWAP){
-    printf("case2\n");
     bool dirty = pagedir_is_dirty(t->pagedir, upage) || spte->dirty;
     if(dirty){
       void * temp_page  = malloc(sizeof(upage));
@@ -311,6 +315,15 @@ void sup_page_unmap(void* upage, int size, off_t file_ofs){
   }else{
     printf("PANIC. NO case remain\n");
   }
-  // 여기도 에러를 만든다 
+  // 여기도 에러를 만든다
   hash_delete(t->spt,&spte->h_elem);
+  free(spte);
 }
+/*
+frame : allocate, remove, pinning
+map, unmap, filesys lock 쓰고
+pinning 포인트 -> docu 보면서 생각
+
+lock, sema 없는 곳 체크
+필요한데 없는 곳 체크
+*/

@@ -165,74 +165,21 @@ find_file (int fd)
   return NULL;
 }
 
-void
-free_fds ()
+static void
+free_fds (void)
 {
   struct thread *t = thread_current ();
   struct list_elem *e;
   struct file_descriptor *fd_info;
 
-  sema_down_filesys ();
   while (!list_empty(&t->fds)) {
+    sema_down_filesys();
     e = list_pop_front(&t->fds);
     fd_info = list_entry (e, struct file_descriptor, elem);
     file_close (fd_info->file);
     free (fd_info);
+    sema_up_filesys ();
   }
-  sema_up_filesys ();
-}
-
-void
-free_mmap_all()
-{
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-  struct map_desc * mdesc;
-  
-  while(!list_empty(&t->map_list)) {
-    e = list_begin(&t->map_list);
-    mdesc = list_entry (e, struct map_desc, elem);
-    free_mmap_one(mdesc->id);
-  }
-  
-}
-
-//free one mmap with mapid
-bool
-free_mmap_one(mapid_t mapid)
-{
-  struct map_desc * mdesc = find_map_desc(mapid);
-  if (mdesc == NULL){
-    printf("PANIC. can not find map_desc\n");
-    return false;
-  }
-  
-  void * page_start;
-  size_t written_size;
-  for(int file_ofs = 0; file_ofs < (mdesc->size); file_ofs=file_ofs+PGSIZE){
-    page_start = mdesc->address + file_ofs;
-    written_size = (mdesc->size - file_ofs > PGSIZE ? PGSIZE : mdesc->size - file_ofs);
-    sup_page_unmap(page_start, written_size, file_ofs);
-  }
-  file_close(mdesc->file);
-  list_remove(&mdesc->elem);
-  free(mdesc);
-}
-
-struct map_desc *
-find_map_desc (mapid_t mapid)
-{
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-  struct map_desc *mdesc;
-  for (e = list_begin (&t->map_list); e != list_end (&t->map_list); e = e->next)
-  {
-    mdesc = list_entry (e, struct map_desc, elem);
-    if (mdesc->id == mapid) {
-      return mdesc;
-    }
-  }
-  return NULL;
 }
 
 /* Idle thread. */

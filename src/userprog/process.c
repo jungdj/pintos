@@ -146,8 +146,6 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
-  lock_acquire (&frame_table_lock);
-  
   struct thread *cur = thread_current ();
   uint32_t *pd;
   struct hash *spt;
@@ -156,8 +154,14 @@ process_exit (void)
   if (file != NULL) {
     file_close (file);
   }
-  free_mmap_all();
+  struct list_elem * e;
   
+  struct map_desc * mdesc;
+  while(!list_empty(&cur->map_list)) {
+    e = list_begin(&cur->map_list);
+    mdesc = list_entry (e, struct map_desc, elem);
+    munmap(mdesc->id);
+  }
   printf("%s: exit(%d)\n", cur->name, cur->exit_status);
   pcb_update_status (cur->exit_status);
   pcb_wait_sema_up ();
@@ -169,7 +173,7 @@ process_exit (void)
     sup_page_destroy (spt);
   }
 #endif
-  lock_release (&frame_table_lock);
+  
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

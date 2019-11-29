@@ -70,13 +70,10 @@ sort_chunks (const char *subprocess, int exit_status)
 
       CHECK (wait (children[i]) == exit_status, "wait for child %zu", i);
       /* Read chunk back from file. */
-      quiet = false;
+      quiet = true;
       snprintf (fn, sizeof fn, "buf%zu", i);
-      printf("start");
       CHECK ((handle = open (fn)) > 1, "open \"%s\"", fn);
-      printf("finish open\n");
       read (handle, buf1 + CHUNK_SIZE * i, CHUNK_SIZE);
-      printf("finish read\n");
       close (handle);
       quiet = false;
     }
