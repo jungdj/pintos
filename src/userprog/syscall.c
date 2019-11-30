@@ -334,9 +334,9 @@ read (int fd, void *buffer, unsigned length)
 
   if (file != NULL){
 #ifdef VM
-    printf("before pin buffer\n");
+    // printf("before pin buffer\n");
     load_and_pin_buffer (buffer, length);
-    printf("after pin buffer\n");
+    // printf("after pin buffer\n");
 #endif
     result = file_read (file, buffer, length);
 #ifdef VM
