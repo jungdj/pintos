@@ -5,6 +5,9 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#ifdef VM
+#include "vm/page.h"
+#endif
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -121,6 +124,15 @@ struct thread
     unsigned magic;                     /* Detects stack overflow. */
   };
 
+typedef int mapid_t;
+struct map_desc {
+    mapid_t id; //id
+    void * address; //address mapped
+    struct file * file; //mapped file
+    int size;
+    struct list_elem elem;
+};
+
 struct pcb {
     int ppid;
     int pid;
@@ -140,6 +152,8 @@ void pcb_update_status (int status);
 void pcb_wait_sema_up (void);
 void pcb_p_loaded_sema_up (void);
 void free_pcb (int pid);
+void free_mmap_all();
+bool free_mmap_one(mapid_t mapid);
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -150,6 +164,7 @@ struct thread* find_thread (int tid);
 struct file_descriptor * find_fd (int fd);
 struct file * find_file (int fd);
 
+struct map_desc * find_map_desc (mapid_t fd);
 
 void thread_init (void);
 void thread_start (void);

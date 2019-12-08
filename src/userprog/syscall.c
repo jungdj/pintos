@@ -15,26 +15,23 @@
 #include "vm/page.h"
 
 static void syscall_handler (struct intr_frame *);
-void halt (void);
-int exec (const char *cmd_line);
-int wait (int pid);
-bool create (const char *filename, unsigned initial_size);
-bool remove (const char *file);
-int open (const char *file);
-int filesize (int fd);
-int read (int fd, void *buffer, unsigned length);
-int write (int fd, const void *buffer, unsigned size);
-void seek (int fd, unsigned position);
-unsigned tell (int fd);
-void close (int fd);
-mapid_t mmap (int fd, void* upage);
-void munmap(mapid_t mapid);
+static void halt (void);
+static int exec (const char *cmd_line);
+static int wait (int pid);
+static bool create (const char *filename, unsigned initial_size);
+static bool remove (const char *file);
+static int open (const char *file);
+static int filesize (int fd);
+static int read (int fd, void *buffer, unsigned length);
+static int write (int fd, const void *buffer, unsigned size);
+static void seek (int fd, unsigned position);
+static unsigned tell (int fd);
+static void close (int fd);
+static mapid_t mmap (int fd, void* upage);
+static void munmap(mapid_t mapid);
 static void check_pd (const void *uaddr);
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
-
-struct map_desc *find_map_desc (mapid_t mapid);
-void free_mmap_one(mapid_t mapid);
 
 struct semaphore filesys_sema;
 
@@ -213,7 +210,7 @@ syscall_handler(struct intr_frame *f) {
   }
 }
 
-void
+static void
 halt ()
 {
   shutdown_power_off ();
@@ -229,7 +226,7 @@ exit(int status)
   thread_exit ();
 }
 
-int
+static int
 exec (const char *cmd_line)
 {
   int tid;
@@ -242,13 +239,13 @@ exec (const char *cmd_line)
   return tid;
 }
 
-int
+static int
 wait (int pid)
 {
   return process_wait (pid);
 }
 
-bool create
+static bool create
 (const char *filename, unsigned initial_size)
 {
   bool result;
@@ -258,7 +255,7 @@ bool create
   return result;
 }
 
-int
+static int
 write (int fd, const void *buffer, unsigned size)
 {
   if (fd == 1) {
@@ -287,7 +284,7 @@ write (int fd, const void *buffer, unsigned size)
   }
 }
 
-bool
+static bool
 remove(const char *file_name)
 {
   bool success;
@@ -297,7 +294,7 @@ remove(const char *file_name)
   return success;
 }
 
-int
+static int
 open (const char *file_name)
 {
   struct thread *t = thread_current ();
@@ -324,19 +321,25 @@ open (const char *file_name)
   return result;
 }
 
-int
+static int
 read (int fd, void *buffer, unsigned length)
 {
   int result = -1;
   struct file *file;
+  char tmp;
   sema_down (&filesys_sema);
   file = find_file(fd);
 
   if (file != NULL){
 #ifdef VM
-    // printf("before pin buffer\n");
-    load_and_pin_buffer (buffer, length);
-    // printf("after pin buffer\n");
+    tmp = *(char *)buffer;
+    if (tmp)
+    {
+      load_and_pin_buffer (buffer, length);
+    }
+    else {
+      load_and_pin_buffer (buffer, length);
+    }
 #endif
     result = file_read (file, buffer, length);
 #ifdef VM
@@ -348,7 +351,7 @@ read (int fd, void *buffer, unsigned length)
   return result;
 }
 
-void
+static void
 seek (int fd, unsigned position)
 {
   sema_down (&filesys_sema);
@@ -360,7 +363,7 @@ seek (int fd, unsigned position)
   sema_up (&filesys_sema);
 }
 
-int
+static int
 filesize (int fd)
 {
   int result = -1;
@@ -375,7 +378,7 @@ filesize (int fd)
   return result;
 }
 
-unsigned 
+static unsigned 
 tell (int fd)
 {
   int result;
@@ -386,7 +389,7 @@ tell (int fd)
   return result; 
 }
 
-void
+static void
 close (int fd)
 {
   sema_down (&filesys_sema);
@@ -399,7 +402,7 @@ close (int fd)
   sema_up (&filesys_sema);
 }
 
-mapid_t 
+static mapid_t 
 mmap (int fd, void* upage)
 {
   sema_down(&filesys_sema);
@@ -431,8 +434,7 @@ mmap (int fd, void* upage)
   
   //check finish. make map_desc
   struct map_desc * mdesc = malloc(sizeof (struct map_desc));
-  mapid_t map_id = (mapid_t) global_mapid++;
-  mdesc->id = map_id;
+  mdesc->id = global_mapid++;
   mdesc->address = upage;
   mdesc->file = new_file;
   mdesc->size = file_size;
@@ -445,25 +447,11 @@ mmap (int fd, void* upage)
     sema_up(&filesys_sema);
     return -1;
 }
-void
+static void
 munmap(mapid_t mapid)
 {
   sema_down(&filesys_sema);
-  struct map_desc * mdesc = find_map_desc(mapid);
-  if (mdesc == NULL){
-    printf("PANIC. can not find map_desc\n");
-    return false;
-  }
-  void * page_start;
-  size_t written_size;
-  for(int file_ofs = 0; file_ofs < (mdesc->size); file_ofs=file_ofs+PGSIZE){
-    page_start = mdesc->address + file_ofs;
-    written_size = (mdesc->size - file_ofs > PGSIZE ? PGSIZE : mdesc->size - file_ofs);
-    sup_page_unmap(page_start, written_size, file_ofs);
-  }
-  list_remove(&mdesc->elem);
-  file_close(mdesc->file);
-  free(mdesc);
+  free_mmap_one(mapid);
   sema_up(&filesys_sema);
 }
 
@@ -484,9 +472,7 @@ load_and_pin_buffer (const void *buffer, unsigned length)
   void *upage;
   for(upage = pg_round_down (buffer); upage < buffer + length; upage += PGSIZE)
   {
-    // printf("sup_page_load_page_and_pin :%p start\n", upage);
     sup_page_load_page_and_pin (upage, true, true);
-    // printf("sup_page_load_page_and_pin :%p\ end\n", upage);
   }
 }
 
@@ -498,20 +484,4 @@ unpin_buffer (const void *buffer, unsigned length)
   {
     sup_page_update_frame_pinned (upage, false);
   }
-}
-
-struct map_desc *
-find_map_desc (mapid_t mapid)
-{
-  struct thread *t = thread_current ();
-  struct list_elem *e;
-  struct map_desc *mdesc;
-  for (e = list_begin (&t->map_list); e != list_end (&t->map_list); e = e->next)
-  {
-    mdesc = list_entry (e, struct map_desc, elem);
-    if (mdesc->id == mapid) {
-      return mdesc;
-    }
-  }
-  return NULL;
 }

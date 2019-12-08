@@ -127,13 +127,12 @@ int
 process_wait (tid_t child_tid)
 {
   int val;
-  // printf("wait start\n");
+
   struct pcb *p = find_child_pcb (child_tid);
 
-  if (p == NULL){
-    // printf("null case!!!!!!");
+  if (p == NULL)
     return -1;
-  }
+
   sema_down (&p->wait_sema);
   val = p->exit_status;
   list_remove (&p->elem);
@@ -154,26 +153,19 @@ process_exit (void)
   if (file != NULL) {
     file_close (file);
   }
-  struct list_elem * e;
-  
-  struct map_desc * mdesc;
-  while(!list_empty(&cur->map_list)) {
-    e = list_begin(&cur->map_list);
-    mdesc = list_entry (e, struct map_desc, elem);
-    munmap(mdesc->id);
-  }
+
   printf("%s: exit(%d)\n", cur->name, cur->exit_status);
   pcb_update_status (cur->exit_status);
   pcb_wait_sema_up ();
 
 #ifdef VM
+  free_mmap_all();
   spt = cur->spt;
   if (spt != NULL)
   {
     sup_page_destroy (spt);
   }
 #endif
-  
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

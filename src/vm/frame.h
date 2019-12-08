@@ -3,8 +3,8 @@
 #include <hash.h>
 #include "vm/page.h"
 
-// #ifndef VM_FRAME_H
-// #define VM_FRAME_H
+#ifndef VM_FRAME_H
+#define VM_FRAME_H
 
 struct frame_table_entry
 {
@@ -26,4 +26,4 @@ void fte_install_spte (void *kpage, struct sup_page_table_entry *spte);
 void free_frame_with_lock (void *kpage);
 void free_frame (void *addr);
 void * select_victim_frame (void);
-struct lock frame_table_lock;
+#endif /* vm/frame.h */
