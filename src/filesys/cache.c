@@ -2,10 +2,11 @@
 
 #include "devices/block.h"
 #include "threads/synch.h"
+#include "filesys/filesys.h"
 
 #define CACHE_CNT 64
 
-struct cache_entry cache_array[CACHE_CNT];
+static struct cache_entry cache_array[CACHE_CNT];
 
 void buffer_cache_init(void){
     for(int i=0; i<CACHE_CNT; i++){
@@ -22,11 +23,10 @@ void buffer_cache_close(void){
 //Substitute of block_write
 void buffer_cache_write(block_sector_t sector, const void *buffer){
     /*Todo write*/
-    return;
+    block_write(fs_device, sector, buffer);
 };
 
 //Substitute of block_read
 void buffer_cache_read(block_sector_t sector, void * buffer){
-    /*Todo read*/
-    return;
+    block_read(fs_device, sector, buffer);
 };
