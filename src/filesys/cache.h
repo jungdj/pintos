@@ -6,9 +6,12 @@
 struct cache_entry{
     bool is_use; 
 
-    struct lock * cache_lock; /*Individual lock for entry*/
+    // struct lock * cache_lock; /*Individual lock for entry*/
     block_sector_t sector; /* data_idx */
     char data[BLOCK_SECTOR_SIZE]; /*Real block data*/
+
+    bool is_dirty;
+    bool is_accessed;
 };
 
 //Substitute of block_read, block_write

@@ -21,10 +21,10 @@ filesys_init (bool format)
   fs_device = block_get_role (BLOCK_FILESYS);
   if (fs_device == NULL)
     PANIC ("No file system device found, can't initialize file system.");
-
+  
+  buffer_cache_init();
   inode_init ();
   free_map_init ();
-
   if (format) 
     do_format ();
 

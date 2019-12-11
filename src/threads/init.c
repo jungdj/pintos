@@ -40,6 +40,7 @@
 #include "devices/ide.h"
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
+#include "filesys/cache.h"
 #endif
 
 /* Page directory with kernel mappings only. */
@@ -111,7 +112,6 @@ main (void)
 #ifdef VM
   frame_init ();
 #endif
-
   /* Initialize interrupt handlers. */
   intr_init ();
   timer_init ();
@@ -121,7 +121,6 @@ main (void)
   exception_init ();
   syscall_init ();
 #endif
-
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();
