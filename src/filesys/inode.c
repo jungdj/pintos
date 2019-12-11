@@ -248,7 +248,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-  free (bounce);
+  // free (bounce); 
 
   return bytes_read;
 }
@@ -273,6 +273,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     {
       /* Sector to write, starting byte offset within sector. */
       block_sector_t sector_idx = byte_to_sector (inode, offset);
+      bool new_idx = false;
+      /* allocate new sector_idx*/
+      if (sector_idx == -1){
+        free_map_allocate(1, &sector_idx);
+        new_idx = true;
+      }
+
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
 
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
@@ -281,47 +288,45 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       int min_left = inode_left < sector_left ? inode_left : sector_left;
 
       /* Number of bytes to actually write into this sector. */
+      // int chunk_size = size < min_left ? size : min_left;
       int chunk_size = size < min_left ? size : min_left;
+      
       if (chunk_size <= 0)
         break;
-
-      // if (sector_ofs > 0 || chunk_size < sector_left){
-      //   buffer_cache_read(sector_idx, buffer + bytes_written, 0, BLOCK_SECTOR_SIZE);
-      // }else
-
-      buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
-      // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-      //   {
-      //     /* Write full sector directly to disk. */
-      //     buffer_cache_write(sector_idx, buffer + bytes_written);
-      //   }
-      // else 
-      //   {
-      //     /* We need a bounce buffer. */
-      //     if (bounce == NULL) 
-      //       {
-      //         bounce = malloc (BLOCK_SECTOR_SIZE);
-      //         if (bounce == NULL)
-      //           break;
-      //       }
-
-      //     /* If the sector contains data before or after the chunk
-      //        we're writing, then we need to read in the sector
-      //        first.  Otherwise we start with a sector of all zeros. */
-      //     if (sector_ofs > 0 || chunk_size < sector_left) 
-      //       buffer_cache_read(sector_idx, bounce, 0, BLOCK_SECTOR_SIZE);
-      //     else
-      //       memset (bounce, 0, BLOCK_SECTOR_SIZE);
-      //     memcpy (bounce + sector_ofs, buffer + bytes_written, chunk_size);
-      //     buffer_cache_write(sector_idx, bounce);
-      //   }
+      
+      /*Growth case - last block*/
+      if (inode_left < BLOCK_SECTOR_SIZE && size > inode_left){
+        if(size+sector_ofs > BLOCK_SECTOR_SIZE){
+          inode->data.length = offset + sector_left;
+          buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+          /*Todo file growth*/
+          /*
+          file growth:
+          하나의 sector 추가 할당
+          */
+          // block_sector_t new_sector_idx=0;
+          // free_map_allocate(1, &new_sector_idx);
+          // buffer_cache_write(new_sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+          
+          //new_sector_idx를 inode에 포함시킨다.
+          //inode->data.length = offset + chunk_size;
+        /*Just Length Growth*/
+        }else{
+          chunk_size = size;
+          inode->data.length = offset + chunk_size;
+          buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+        }
+      /*Not last block*/
+      }else{
+        buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+      }
 
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
       bytes_written += chunk_size;
     }
-  free (bounce);
+  // free (bounce);
 
   return bytes_written;
 }
