@@ -41,6 +41,7 @@ void buffer_cache_close(void){
 //Substitute of block_write
 //default option: sector_ofs = 0, chunk_size = BLOCK_SECTOR_SIZE
 void buffer_cache_write(block_sector_t sector, const void *buffer, int sector_ofs, int chunk_size){
+    ASSERT(sector_ofs+chunk_size <= BLOCK_SECTOR_SIZE);
     struct cache_entry * entry;
     
     lock_acquire(&cache_lock);
@@ -49,8 +50,11 @@ void buffer_cache_write(block_sector_t sector, const void *buffer, int sector_of
         entry = find_entry_to_store();
         entry->is_use = true;
         entry->sector = sector;
+        if (sector_ofs > 0) 
+            block_read(fs_device, sector, entry->data);
+        else
+            memset (entry->data, 0, BLOCK_SECTOR_SIZE);
     }
-    /*Todo write*/
     memcpy(entry->data + sector_ofs, buffer, chunk_size);
     entry->is_accessed = true;
     entry->is_dirty=true;
