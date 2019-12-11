@@ -22,25 +22,25 @@ void buffer_cache_init(void){
         cache_array[i].is_use = false;
     }
     lock_init(&cache_lock);
-    printf("is it run?");
     second_chance_idx = 0;
 }
 
 //Prepare for filesys_done, do flush
 void buffer_cache_close(void){
-    lock_acquire(&cache_lock);
+    // lock_acquire(&cache_lock);
     for(int i=0; i<CACHE_CNT; i++){
         if(cache_array[i].is_use || cache_array[i].is_dirty){
             block_write(fs_device, cache_array[i].sector, cache_array[i].data);
             cache_array[i].is_dirty = false;
         }
     }
-    lock_release(&cache_lock);
+    // lock_release(&cache_lock);
     return;
 }
 
 //Substitute of block_write
-void buffer_cache_write(block_sector_t sector, const void *buffer){
+//default option: sector_ofs = 0, chunk_size = BLOCK_SECTOR_SIZE
+void buffer_cache_write(block_sector_t sector, const void *buffer, int sector_ofs, int chunk_size){
     struct cache_entry * entry;
     
     lock_acquire(&cache_lock);
@@ -51,15 +51,14 @@ void buffer_cache_write(block_sector_t sector, const void *buffer){
         entry->sector = sector;
     }
     /*Todo write*/
-    memcpy(entry->data, buffer, BLOCK_SECTOR_SIZE);
+    memcpy(entry->data + sector_ofs, buffer, chunk_size);
     entry->is_accessed = true;
     entry->is_dirty=true;
     lock_release(&cache_lock);
-    // block_write(fs_device, sector, entry->data);
 };
 
 //Substitute of block_read
-void buffer_cache_read(block_sector_t sector, void * buffer){
+void buffer_cache_read(block_sector_t sector, void * buffer, int sector_ofs, int chunk_size){
     struct cache_entry * entry;
 
     lock_acquire(&cache_lock);
@@ -72,10 +71,9 @@ void buffer_cache_read(block_sector_t sector, void * buffer){
         entry->is_dirty = false;
         block_read(fs_device, sector, entry->data);
     }
-    memcpy(buffer, entry->data, BLOCK_SECTOR_SIZE);
+    memcpy(buffer, entry->data + sector_ofs, chunk_size);
     entry->is_accessed = true;
     lock_release(&cache_lock);   
-    // block_read(fs_device, sector, entry->data);
 };
 
 /* Find cache array element
@@ -99,7 +97,6 @@ struct cache_entry * find_entry_to_store(void){
         }
     }
 
-    // struct cache_entry * evicted_entry;
     int current_idx;
     //eviction case
     for(int i=0; i<CACHE_CNT*2; i++){
