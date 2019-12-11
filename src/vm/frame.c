@@ -147,8 +147,8 @@ free_frame_with_lock (void *kpage)
   struct hash_elem *h_elem = hash_find (&frame_table, &tmp_fte->h_elem);
   free (tmp_fte);
   if (h_elem == NULL) {
-    printf("PANIC can not find hash_elem\n");
     // TODO: Frame not found!? handle it
+//    PANIC ("Can not find hash_elem\n");
     return;
   }
 
@@ -170,7 +170,7 @@ select_victim_frame (void)
   n = hash_size (&frame_table);
 
   hash_first (&it, &frame_table);
-  for(i = 0; i <= victim_index; ++i)
+  for(i = 0; i <= victim_index % n; ++i)
     hash_next (&it);
 
   do {
