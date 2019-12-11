@@ -40,6 +40,10 @@ set(SOURCE_FILES threads/thread.c
         vm/page.c
         vm/swap.c
         filesys/filesys.c
+        filesys/file.c
+        filesys/inode.c
+        filesys/cache.c
+        filesys/directory.c
         lib/string.c
         lib/user/syscall.c
         lib/kernel/list.c
