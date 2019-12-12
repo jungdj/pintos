@@ -285,40 +285,29 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = inode_length (inode) - offset;
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
-      int min_left = inode_left < sector_left ? inode_left : sector_left;
+      // int min_left = inode_left < sector_left ? inode_left : sector_left;
 
       /* Number of bytes to actually write into this sector. */
       // int chunk_size = size < min_left ? size : min_left;
-      int chunk_size = size < min_left ? size : min_left;
+      int chunk_size = size < sector_left ? size : sector_left;
       
-      if (chunk_size <= 0)
-        break;
+      // if (chunk_size <= 0)
+      //   break;
       
       /*Growth case - last block*/
       if (inode_left < BLOCK_SECTOR_SIZE && size > inode_left){
         if(size+sector_ofs > BLOCK_SECTOR_SIZE){
           inode->data.length = offset + sector_left;
-          buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
-          /*Todo file growth*/
-          /*
-          file growth:
-          하나의 sector 추가 할당
-          */
-          // block_sector_t new_sector_idx=0;
-          // free_map_allocate(1, &new_sector_idx);
-          // buffer_cache_write(new_sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
-          
-          //new_sector_idx를 inode에 포함시킨다.
-          //inode->data.length = offset + chunk_size;
+          //size가 커서 sector_left == chunk_size
         /*Just Length Growth*/
         }else{
-          chunk_size = size;
           inode->data.length = offset + chunk_size;
-          buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
         }
       /*Not last block*/
-      }else{
-        buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+      }
+      buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
+      if(new_idx){
+        /*append sector*/
       }
 
       /* Advance. */
