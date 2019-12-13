@@ -166,7 +166,7 @@ find_file (int fd)
 }
 
 void
-free_fds ()
+free_fds (void)
 {
   struct thread *t = thread_current ();
   struct list_elem *e;
@@ -183,7 +183,7 @@ free_fds ()
 }
 
 void
-free_mmap_all()
+free_mmap_all(void)
 {
   struct thread *t = thread_current ();
   struct list_elem *e;
@@ -217,6 +217,7 @@ free_mmap_one(mapid_t mapid)
   file_close(mdesc->file);
   list_remove(&mdesc->elem);
   free(mdesc);
+  return true;
 }
 
 struct map_desc *

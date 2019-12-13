@@ -158,9 +158,7 @@ inode_create (block_sector_t sector, off_t length)
       // TODO. I don't consider calloc failed case.
       struct inode_for_indirect *indirect_inode;
       struct inode_for_indirect *doubly_indirect_inode;
-      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];
-
-      static char zeros[BLOCK_SECTOR_SIZE];      
+      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];     
       
       //TODO filesys가 꽉차서 free_map_allocation이 실패하는 경우(BITMAP_ERROR return) 고려 X
       while (allocated_sectors_cnt != sectors){
@@ -173,7 +171,7 @@ inode_create (block_sector_t sector, off_t length)
           case INDIRECT:
             idx_in_indirect = allocated_sectors_cnt-DIRECT_BLOCK_CNT;
             //allocate new inode indirect inode
-            if(disk_inode->indirect == NULL){
+            if(!disk_inode->indirect){
               free_map_allocate(1, &disk_inode->indirect);
               indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
@@ -185,13 +183,13 @@ inode_create (block_sector_t sector, off_t length)
             idx_in_indirect_for_doubly = (allocated_sectors_cnt-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
             
             //allocate new doubly indirect inode. Just one time.
-            if(disk_inode->doubley_indirect == NULL){
+            if(!disk_inode->doubley_indirect){
               free_map_allocate(1, &disk_inode->doubley_indirect);
               doubly_indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
 
             //allocate new indirect inode for doubly connected.
-            if(doubly_indirect_inode->indirect[idx_in_doubly]==NULL){
+            if(!doubly_indirect_inode->indirect[idx_in_doubly]){
               free_map_allocate(1, &doubly_indirect_inode->indirect[idx_in_doubly]);
               indirect_for_doubly[idx_in_doubly] = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
@@ -407,7 +405,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 {
   uint8_t *buffer = buffer_;
   off_t bytes_read = 0;
-  uint8_t *bounce = NULL;
 
   while (size > 0) 
     {
@@ -452,7 +449,6 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       offset += chunk_size;
       bytes_read += chunk_size;
     }
-  // free (bounce); 
 
   return bytes_read;
 }
@@ -468,7 +464,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 {
   const uint8_t *buffer = buffer_;
   off_t bytes_written = 0;
-  uint8_t *bounce = NULL;
 
   if (inode->deny_write_cnt)
     return 0;

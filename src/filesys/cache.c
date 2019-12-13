@@ -115,7 +115,7 @@ struct cache_entry * find_entry_to_store(void){
             return &cache_array[current_idx];
         }
     }
-    printf("PANIC : Can not reach here!!\n");    
+    PANIC("PANIC : Can not reach here. find_entry_to_store");    
     return NULL;
 };
 

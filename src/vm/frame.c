@@ -103,7 +103,7 @@ allocate_frame_and_pin (enum palloc_flags flags, void *upage, bool pinned)
 void *
 allocate_frame (enum palloc_flags flags, void *upage)
 {
-  allocate_frame_and_pin (flags, upage, false);
+  return allocate_frame_and_pin (flags, upage, false);
 }
 
 void
@@ -195,4 +195,6 @@ select_victim_frame (void)
     }
     pagedir_set_accessed (fte->owner->pagedir, fte->upage, false);
   } while (hash_next(&it));
+
+  PANIC("Can not reach here. Select_victim_frame");
 }

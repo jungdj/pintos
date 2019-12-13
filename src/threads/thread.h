@@ -152,7 +152,7 @@ void pcb_update_status (int status);
 void pcb_wait_sema_up (void);
 void pcb_p_loaded_sema_up (void);
 void free_pcb (int pid);
-void free_mmap_all();
+void free_mmap_all(void);
 bool free_mmap_one(mapid_t mapid);
 
 /* If false (default), use round-robin scheduler.

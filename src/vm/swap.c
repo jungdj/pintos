@@ -39,7 +39,7 @@ swap_init (void)
  * 5. Use helper function read_from_disk in order to read the contents
  * of the disk into the frame. 
  */ 
-bool 
+void
 swap_in (size_t swap_index, void *page)
 {
   lock_acquire(&swap_lock);
@@ -91,23 +91,5 @@ free_swap_slot (size_t swap_index)
   lock_acquire(&swap_lock);
   bitmap_set (swap_table, swap_index, true);
   lock_release(&swap_lock);
-}
-
-
-/* 
- * Read data from swap device to frame. 
- * Look at device/disk.c
- */
-void read_from_disk (uint8_t *frame, int index)
-{
-
-
-}
-
-/* Write data to swap device from frame */
-void write_to_disk (uint8_t *frame, int index)
-{
-
-
 }
 
