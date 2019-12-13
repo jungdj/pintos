@@ -10,7 +10,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECT_BLOCK_CNT 123
+#define DIRECT_BLOCK_CNT 124
 #define INDIRECT_BLOCK_CNT 128
 
 /* On-disk inode.
@@ -20,7 +20,6 @@ struct inode_disk
     block_sector_t direct[DIRECT_BLOCK_CNT];/* data sectors. */
     block_sector_t indirect;                /* indirect sectors. */
     block_sector_t doubley_indirect;        /* doubly_indirect sectors. */
-    block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     // uint32_t unused[125];
@@ -66,13 +65,13 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
   ASSERT (inode != NULL);
-  struct inode_disk * in_disk = &inode->data;
-  if (pos < in_disk->length){
+  struct inode_disk in_disk = inode->data;
+  if (pos < in_disk.length){
     off_t sector_idx = pos / BLOCK_SECTOR_SIZE;
     
     //status DIRECT case
     if(sector_idx<DIRECT_BLOCK_CNT){
-      return in_disk->direct[sector_idx];
+      return in_disk.direct[sector_idx];
     
     //status INDIRECT case
     }else if(sector_idx<DIRECT_BLOCK_CNT + INDIRECT_BLOCK_CNT){
@@ -81,7 +80,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
       off_t idx_in_indirect = sector_idx - DIRECT_BLOCK_CNT;
 
       indirect_inode = calloc(1, sizeof(struct inode_for_indirect));
-      buffer_cache_read(in_disk->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+      buffer_cache_read(in_disk.indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
       ret = indirect_inode->indirect[idx_in_indirect];
       
       free(indirect_inode);
@@ -96,7 +95,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
       off_t idx_in_indirect_for_doubly = (sector_idx-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
 
       doubly_indirect_inode = calloc(1, sizeof(struct inode_for_indirect));
-      buffer_cache_read(in_disk->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+      buffer_cache_read(in_disk.doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
       indirect_for_doubly = calloc(1, sizeof(struct inode_for_indirect));
       buffer_cache_read(doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly, 0, BLOCK_SECTOR_SIZE);
 
@@ -225,6 +224,7 @@ inode_create (block_sector_t sector, off_t length)
       }
       
       success = true;
+      buffer_cache_write(sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
 
       free (disk_inode);
       free (indirect_inode);
