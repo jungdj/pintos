@@ -4,6 +4,7 @@
 #include "filesys/file.h"
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
+#include "filesys/cache.h"
 
 static struct file *free_map_file;   /* Free map file. */
 static struct bitmap *free_map;      /* Free map, one bit per sector. */
@@ -28,6 +29,7 @@ bool
 free_map_allocate (size_t cnt, block_sector_t *sectorp)
 {
   block_sector_t sector = bitmap_scan_and_flip (free_map, 0, cnt, false);
+  static char zeros[BLOCK_SECTOR_SIZE];
   if (sector != BITMAP_ERROR
       && free_map_file != NULL
       && !bitmap_write (free_map, free_map_file))
@@ -35,8 +37,11 @@ free_map_allocate (size_t cnt, block_sector_t *sectorp)
       bitmap_set_multiple (free_map, sector, cnt, false); 
       sector = BITMAP_ERROR;
     }
-  if (sector != BITMAP_ERROR)
+  if (sector != BITMAP_ERROR){
     *sectorp = sector;
+    for(int i=0; i<cnt; i++)
+      buffer_cache_write (sector + i, zeros, 0, BLOCK_SECTOR_SIZE);
+  }
   return sector != BITMAP_ERROR;
 }
 

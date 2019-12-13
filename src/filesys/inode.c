@@ -68,7 +68,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
   ASSERT (inode != NULL);
   struct inode_disk * in_disk = &inode->data;
   if (pos < in_disk->length){
-    off_t sector_idx = pos / BLOCK_SECTOR_SIZE; //or bytes_to_sectors(pos)
+    off_t sector_idx = pos / BLOCK_SECTOR_SIZE;
     
     //status DIRECT case
     if(sector_idx<DIRECT_BLOCK_CNT){
@@ -87,7 +87,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
       free(indirect_inode);
       
       return ret;
-    //statud DOUBLEY_INDIRECT case
+    //status DOUBLEY_INDIRECT case
     }else{
       block_sector_t ret;
       struct inode_for_indirect *doubly_indirect_inode;
@@ -106,7 +106,6 @@ byte_to_sector (const struct inode *inode, off_t pos)
       free(indirect_for_doubly);
       return ret;
     }
-    // return inode->data.start + pos / BLOCK_SECTOR_SIZE;
   }
   else
     return -1;
@@ -147,7 +146,7 @@ inode_create (block_sector_t sector, off_t length)
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
 
-      size_t need_sectors = sectors; // remained number
+      block_sector_t allocated_sectors_cnt = 0;
       
       //block sectors to compute
       block_sector_t allocating_sector; // next sector to write
@@ -159,76 +158,74 @@ inode_create (block_sector_t sector, off_t length)
       // TODO. I don't consider calloc failed case.
       struct inode_for_indirect *indirect_inode;
       struct inode_for_indirect *doubly_indirect_inode;
-      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];      
+      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];
 
-      while (need_sectors >0){
+      static char zeros[BLOCK_SECTOR_SIZE];      
+      
+      //TODO filesys가 꽉차서 free_map_allocation이 실패하는 경우(BITMAP_ERROR return) 고려 X
+      while (allocated_sectors_cnt != sectors){
         //direct case
         switch(status){
           case DIRECT:
-            allocating_sector = &disk_inode->direct[sectors-need_sectors];
+            allocating_sector = &disk_inode->direct[allocated_sectors_cnt];
             break;
           
           case INDIRECT:
-            idx_in_indirect = sectors-need_sectors-DIRECT_BLOCK_CNT;
+            idx_in_indirect = allocated_sectors_cnt-DIRECT_BLOCK_CNT;
             //allocate new inode indirect inode
             if(&disk_inode->indirect == NULL){
-              indirect_inode = calloc(1, sizeof *indirect_inode);
-              disk_inode->indirect = indirect_inode;
               free_map_allocate(1, &disk_inode->indirect);
+              indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
-            allocating_sector = indirect_inode->indirect[idx_in_indirect];
+            allocating_sector = &indirect_inode->indirect[idx_in_indirect];
             break;
           
           case DOUBLEY_INDIRECT:
-            idx_in_doubly = (sectors-need_sectors-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) / INDIRECT_BLOCK_CNT;
-            idx_in_indirect_for_doubly = (sectors-need_sectors-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
+            idx_in_doubly = (allocated_sectors_cnt-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) / INDIRECT_BLOCK_CNT;
+            idx_in_indirect_for_doubly = (allocated_sectors_cnt-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
             
             //allocate new doubly indirect inode. Just one time.
             if(&disk_inode->doubley_indirect == NULL){
-              doubly_indirect_inode = calloc(1, sizeof *doubly_indirect_inode);
-              disk_inode->doubley_indirect = doubly_indirect_inode;
               free_map_allocate(1, &disk_inode->doubley_indirect);
+              doubly_indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
 
             //allocate new indirect inode for doubly connected.
             if(doubly_indirect_inode->indirect[idx_in_doubly]==NULL){
-              indirect_for_doubly[idx_in_doubly] = calloc(1, sizeof *doubly_indirect_inode);
-              doubly_indirect_inode->indirect[idx_in_doubly] = indirect_for_doubly[idx_in_doubly];
-              free_map_allocate(1, doubly_indirect_inode->indirect[idx_in_doubly]);
+              free_map_allocate(1, &doubly_indirect_inode->indirect[idx_in_doubly]);
+              indirect_for_doubly[idx_in_doubly] = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
-            allocating_sector = ((struct inode_for_indirect *)doubly_indirect_inode->indirect[idx_in_doubly])
-              ->indirect[idx_in_indirect_for_doubly];
+            allocating_sector = &indirect_for_doubly[idx_in_doubly][idx_in_indirect_for_doubly];
             break;
           
           default:
-            printf("PANIC!! Cannot reach here");
-            ASSERT(false);
+            PANIC("PANIC!! Cannot reach here");
             break;
         }
         //It seems success. then map disk_node to 
-        if (free_map_allocate(1, allocating_sector))
-          buffer_cache_write (allocating_sector, &disk_inode->direct[sectors-need_sectors], 0, BLOCK_SECTOR_SIZE);
-        need_sectors --;
+        free_map_allocate(1, allocating_sector);
+        // buffer_cache_write (allocating_sector, zeros, 0, BLOCK_SECTOR_SIZE);
+
+        //go to next sectors
+        allocated_sectors_cnt ++;
 
         //Change status
         switch (status)
         {
         case DIRECT:
-          if (allocating_sector == disk_inode->direct[DIRECT_BLOCK_CNT-1])
+          if (allocated_sectors_cnt == DIRECT_BLOCK_CNT)
             status = INDIRECT;
           break;
         case INDIRECT:
-          if (allocating_sector == indirect_inode->indirect[INDIRECT_BLOCK_CNT-1])
+          if (allocated_sectors_cnt == DIRECT_BLOCK_CNT+INDIRECT_BLOCK_CNT)
             status = DOUBLEY_INDIRECT;
           break;
         default:
           /*do nothing*/
           break;
         }
-
-        //go to next sectors
-        need_sectors --;
       }
+      
       success = true;
 
       free (disk_inode);
@@ -314,11 +311,86 @@ inode_close (struct inode *inode)
       /* Deallocate blocks if removed. */
       if (inode->removed) 
         {
-          free_map_release (inode->sector, 1);
-          free_map_release (inode->data.start,
-                            bytes_to_sectors (inode->data.length)); 
-        }
+          enum sector_status status = DIRECT;
+          struct inode_disk * in_disk = &inode->data;
+          size_t sector_cnt = in_disk->length / BLOCK_SECTOR_SIZE;
+          size_t removed_cnt = 0;
 
+          block_sector_t idx_in_indirect;
+          block_sector_t idx_in_doubly;
+          block_sector_t idx_in_indirect_for_doubly;
+
+          struct inode_for_indirect *indirect_inode;
+          struct inode_for_indirect *doubly_indirect_inode;
+          struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];
+
+          while(sector_cnt != removed_cnt){
+            switch (status)
+            {
+              case DIRECT:
+                free_map_release(in_disk->direct[removed_cnt], 1);
+                break;
+              case INDIRECT:
+                idx_in_indirect = removed_cnt-DIRECT_BLOCK_CNT;
+                if(idx_in_indirect == 0){
+                  indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
+                  buffer_cache_read(in_disk->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+                  free_map_release(in_disk->indirect, 1);
+                }
+                ASSERT(indirect_inode != NULL);
+                free_map_release(indirect_inode->indirect[idx_in_indirect], 1);
+                break;
+              case DOUBLEY_INDIRECT:
+                idx_in_doubly = (removed_cnt-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT)/BLOCK_SECTOR_SIZE;
+                idx_in_indirect_for_doubly = (removed_cnt-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT)&BLOCK_SECTOR_SIZE;
+
+                if(idx_in_doubly == 0){
+                  doubly_indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
+                  buffer_cache_read(in_disk->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+                  free_map_release(in_disk->doubley_indirect, 1);
+                }
+                if(idx_in_indirect_for_doubly == 0){
+                  ASSERT(doubly_indirect_inode != NULL);
+                  indirect_for_doubly[idx_in_doubly] = (struct inode_for_indirect *)calloc(1, sizeof (struct inode_for_indirect));
+                  buffer_cache_read(doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly[idx_in_doubly], 0, BLOCK_SECTOR_SIZE);
+                  free_map_release(doubly_indirect_inode->indirect[idx_in_doubly], 1);
+                }
+                ASSERT(indirect_for_doubly != NULL);
+                free_map_release(indirect_for_doubly[idx_in_doubly]->indirect[idx_in_indirect_for_doubly], 1);
+                break;
+              default:
+                printf("PANIC!! Cannot reach here");
+                ASSERT(false);
+                break;
+            }
+
+            removed_cnt ++;
+
+             //Change status
+            switch (status)
+            {
+            case DIRECT:
+              if (removed_cnt == DIRECT_BLOCK_CNT)
+                status = INDIRECT;
+              break;
+            case INDIRECT:
+              if (removed_cnt == DIRECT_BLOCK_CNT+INDIRECT_BLOCK_CNT)
+                status = DOUBLEY_INDIRECT;
+              break;
+            default:
+              /*do nothing*/
+              break;
+            }
+          }
+
+          free (indirect_inode);
+          free (doubly_indirect_inode);
+          if (indirect_for_doubly != NULL){
+            for(int i=0; i<INDIRECT_BLOCK_CNT; i++){
+              free (indirect_for_doubly[i]);
+            }
+          }
+        }
       free (inode); 
     }
 }
@@ -412,7 +484,7 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       block_sector_t sector_idx = byte_to_sector (inode, offset);
       bool new_idx = false;
       /* allocate new sector_idx*/
-      if (sector_idx == -1){
+      if (sector_idx == (block_sector_t) -1){
         free_map_allocate(1, &sector_idx);
         new_idx = true;
       }
@@ -452,8 +524,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       offset += chunk_size;
       bytes_written += chunk_size;
     }
-  // free (bounce);
-
   return bytes_written;
 }
 
