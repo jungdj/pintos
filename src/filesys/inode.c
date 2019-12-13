@@ -150,9 +150,9 @@ inode_create (block_sector_t sector, off_t length)
       
       //block sectors to compute
       block_sector_t *allocating_sector; // next sector to write
-      block_sector_t idx_in_indirect; // 
-      block_sector_t idx_in_doubly; // when idx_in_indirect_for_doubly run INDIRECT_BLOCK_CNT times, than increase
-      block_sector_t idx_in_indirect_for_doubly;
+      uint32_t idx_in_indirect = 0; //
+      uint32_t idx_in_doubly = 0; // when idx_in_indirect_for_doubly run INDIRECT_BLOCK_CNT times, than increase
+      uint32_t idx_in_indirect_for_doubly = 0;
 
       // save pointers for use (free) at the end of this function
       // TODO. I don't consider calloc failed case.
@@ -202,6 +202,31 @@ inode_create (block_sector_t sector, off_t length)
         }
         //It seems success. then map disk_node to 
         free_map_allocate(1, allocating_sector);
+
+        switch (status) {
+          case DIRECT:
+            buffer_cache_write(sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+            break;
+          case INDIRECT:
+            if (!idx_in_indirect) {
+              buffer_cache_write(sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+            }
+            buffer_cache_write(disk_inode->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+            break;
+          case DOUBLEY_INDIRECT:
+            if (!idx_in_doubly) {
+              buffer_cache_write(sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+            }
+            if (!idx_in_indirect_for_doubly) {
+              buffer_cache_write(disk_inode->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+            }
+            buffer_cache_write (doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly[idx_in_doubly], 0, BLOCK_SECTOR_SIZE);
+            break;
+          default:
+            PANIC("Cannot reach here!");
+            break;
+        }
+
         // buffer_cache_write (allocating_sector, zeros, 0, BLOCK_SECTOR_SIZE);
 
         //go to next sectors
