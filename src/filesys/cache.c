@@ -29,7 +29,7 @@ void buffer_cache_init(void){
 void buffer_cache_close(void){
     // lock_acquire(&cache_lock);
     for(int i=0; i<CACHE_CNT; i++){
-        if(cache_array[i].is_use || cache_array[i].is_dirty){
+        if(cache_array[i].is_use && cache_array[i].is_dirty){
             block_write(fs_device, cache_array[i].sector, cache_array[i].data);
             cache_array[i].is_dirty = false;
         }

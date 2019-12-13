@@ -23,7 +23,7 @@ include_directories (userprog)
 include_directories (utils)
 include_directories (vm)
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DUSERPROG -DVM")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DUSERPROG -DVM -DFILESYS")
 
 set(SOURCE_FILES threads/thread.c
         threads/synch.c
@@ -47,6 +47,7 @@ set(SOURCE_FILES threads/thread.c
         lib/string.c
         lib/user/syscall.c
         lib/kernel/list.c
+        lib/kernel/bitmap.c
         lib/kernel/hash.c)
 
 add_executable(pintos ${SOURCE_FILES})

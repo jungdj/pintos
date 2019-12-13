@@ -149,7 +149,7 @@ inode_create (block_sector_t sector, off_t length)
       block_sector_t allocated_sectors_cnt = 0;
       
       //block sectors to compute
-      block_sector_t allocating_sector; // next sector to write
+      block_sector_t *allocating_sector; // next sector to write
       block_sector_t idx_in_indirect; // 
       block_sector_t idx_in_doubly; // when idx_in_indirect_for_doubly run INDIRECT_BLOCK_CNT times, than increase
       block_sector_t idx_in_indirect_for_doubly;
@@ -165,7 +165,7 @@ inode_create (block_sector_t sector, off_t length)
         //direct case
         switch(status){
           case DIRECT:
-            allocating_sector = disk_inode->direct[allocated_sectors_cnt];
+            allocating_sector = &disk_inode->direct[allocated_sectors_cnt];
             break;
           
           case INDIRECT:
@@ -175,7 +175,7 @@ inode_create (block_sector_t sector, off_t length)
               free_map_allocate(1, &disk_inode->indirect);
               indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
-            allocating_sector = indirect_inode->indirect[idx_in_indirect];
+            allocating_sector = &indirect_inode->indirect[idx_in_indirect];
             break;
           
           case DOUBLEY_INDIRECT:
@@ -193,7 +193,7 @@ inode_create (block_sector_t sector, off_t length)
               free_map_allocate(1, &doubly_indirect_inode->indirect[idx_in_doubly]);
               indirect_for_doubly[idx_in_doubly] = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
             }
-            allocating_sector = indirect_for_doubly[idx_in_doubly]->indirect[idx_in_indirect_for_doubly];
+            allocating_sector = &indirect_for_doubly[idx_in_doubly]->indirect[idx_in_indirect_for_doubly];
             break;
           
           default:
@@ -201,7 +201,7 @@ inode_create (block_sector_t sector, off_t length)
             break;
         }
         //It seems success. then map disk_node to 
-        free_map_allocate(1, &allocating_sector);
+        free_map_allocate(1, allocating_sector);
         // buffer_cache_write (allocating_sector, zeros, 0, BLOCK_SECTOR_SIZE);
 
         //go to next sectors
