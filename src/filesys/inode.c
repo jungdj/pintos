@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <round.h>
 #include <string.h>
+#include <stdio.h>
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
 #include "filesys/cache.h"
@@ -155,9 +156,9 @@ inode_create (block_sector_t sector, off_t length)
 
       // save pointers for use (free) at the end of this function
       // TODO. I don't consider calloc failed case.
-      struct inode_for_indirect *indirect_inode;
-      struct inode_for_indirect *doubly_indirect_inode;
-      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];     
+      struct inode_for_indirect *indirect_inode= NULL;
+      struct inode_for_indirect *doubly_indirect_inode = NULL;
+      struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT] = {NULL};     
       
       //TODO filesys가 꽉차서 free_map_allocation이 실패하는 경우(BITMAP_ERROR return) 고려 X
       while (allocated_sectors_cnt != sectors){
@@ -316,9 +317,9 @@ inode_close (struct inode *inode)
           block_sector_t idx_in_doubly;
           block_sector_t idx_in_indirect_for_doubly;
 
-          struct inode_for_indirect *indirect_inode;
-          struct inode_for_indirect *doubly_indirect_inode;
-          struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT];
+          struct inode_for_indirect *indirect_inode = NULL;
+          struct inode_for_indirect *doubly_indirect_inode = NULL;
+          struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT] = {NULL};
 
           while(sector_cnt != removed_cnt){
             switch (status)
