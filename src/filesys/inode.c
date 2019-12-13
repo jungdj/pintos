@@ -66,8 +66,48 @@ static block_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) 
 {
   ASSERT (inode != NULL);
-  if (pos < inode->data.length)
-    return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  struct inode_disk * in_disk = &inode->data;
+  if (pos < in_disk->length){
+    off_t sector_idx = pos / BLOCK_SECTOR_SIZE; //or bytes_to_sectors(pos)
+    
+    //status DIRECT case
+    if(sector_idx<DIRECT_BLOCK_CNT){
+      return in_disk->direct[sector_idx];
+    
+    //status INDIRECT case
+    }else if(sector_idx<DIRECT_BLOCK_CNT + INDIRECT_BLOCK_CNT){
+      block_sector_t ret;
+      struct inode_for_indirect *indirect_inode;
+      off_t idx_in_indirect = sector_idx - DIRECT_BLOCK_CNT;
+
+      indirect_inode = calloc(1, sizeof(struct inode_for_indirect));
+      buffer_cache_read(in_disk->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+      ret = indirect_inode->indirect[idx_in_indirect];
+      
+      free(indirect_inode);
+      
+      return ret;
+    //statud DOUBLEY_INDIRECT case
+    }else{
+      block_sector_t ret;
+      struct inode_for_indirect *doubly_indirect_inode;
+      struct inode_for_indirect *indirect_for_doubly;  
+      off_t idx_in_doubly = (sector_idx-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) / INDIRECT_BLOCK_CNT;
+      off_t idx_in_indirect_for_doubly = (sector_idx-DIRECT_BLOCK_CNT-INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
+
+      doubly_indirect_inode = calloc(1, sizeof(struct inode_for_indirect));
+      buffer_cache_read(in_disk->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+      indirect_for_doubly = calloc(1, sizeof(struct inode_for_indirect));
+      buffer_cache_read(doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly, 0, BLOCK_SECTOR_SIZE);
+
+      ret = indirect_for_doubly -> indirect[idx_in_indirect_for_doubly];
+
+      free(doubly_indirect_inode);
+      free(indirect_for_doubly);
+      return ret;
+    }
+    // return inode->data.start + pos / BLOCK_SECTOR_SIZE;
+  }
   else
     return -1;
 }
