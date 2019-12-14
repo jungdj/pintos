@@ -67,7 +67,7 @@ byte_to_sector (const struct inode *inode, off_t pos)
 {
   ASSERT (inode != NULL);
   struct inode_disk in_disk = inode->data;
-  if (pos < in_disk.length){
+  if (pos < in_disk.length) {
     off_t sector_idx = pos / BLOCK_SECTOR_SIZE;
     
     //status DIRECT case
@@ -479,6 +479,50 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
   return bytes_read;
 }
 
+void
+inode_append_sector (struct inode *inode, int sector_idx, off_t size)
+{
+  int sector_cnt = bytes_to_sectors (inode_length (inode));
+  struct inode_disk *disk_inode = &inode->data;
+  struct inode_for_indirect *indirect_inode = NULL;
+  struct inode_for_indirect *doubly_indirect_inode = NULL;
+  struct inode_for_indirect *indirect_for_doubly[INDIRECT_BLOCK_CNT] = {NULL};
+
+  disk_inode->length = sector_cnt * BLOCK_SECTOR_SIZE + size;
+
+  if (sector_cnt < DIRECT_BLOCK_CNT) {
+    disk_inode->direct[sector_cnt] = sector_idx;
+  } else if (sector_cnt < DIRECT_BLOCK_CNT + INDIRECT_BLOCK_CNT) {
+    indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
+    buffer_cache_read (disk_inode->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+    indirect_inode->indirect[sector_cnt - DIRECT_BLOCK_CNT] = sector_idx;
+    buffer_cache_write (disk_inode->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
+    free (indirect_inode);
+  } else {
+    /* Doubly Indirect */
+    doubly_indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
+    buffer_cache_read (disk_inode->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+    int idx_in_doubly = (sector_cnt - DIRECT_BLOCK_CNT - INDIRECT_BLOCK_CNT) / INDIRECT_BLOCK_CNT;
+    int idx_in_indirect_for_doubly = (sector_cnt - DIRECT_BLOCK_CNT - INDIRECT_BLOCK_CNT) % INDIRECT_BLOCK_CNT;
+
+    if (!idx_in_indirect_for_doubly) {
+      block_sector_t indirect_for_doubly_idx;
+      free_map_allocate (1, &indirect_for_doubly_idx);
+      doubly_indirect_inode->indirect[idx_in_doubly] = indirect_for_doubly_idx;
+      buffer_cache_write (disk_inode->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
+    }
+
+    indirect_for_doubly[idx_in_doubly] = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
+    buffer_cache_read (doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly[idx_in_doubly], 0, BLOCK_SECTOR_SIZE);
+    indirect_for_doubly[idx_in_doubly]->indirect[idx_in_indirect_for_doubly] = sector_idx;
+    buffer_cache_write (doubly_indirect_inode->indirect[idx_in_doubly], indirect_for_doubly[idx_in_doubly], 0, BLOCK_SECTOR_SIZE);
+
+    free (doubly_indirect_inode);
+    free (indirect_for_doubly[idx_in_doubly]);
+  }
+  buffer_cache_write (inode->sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+}
+
 /* Writes SIZE bytes from BUFFER into INODE, starting at OFFSET.
    Returns the number of bytes actually written, which may be
    less than SIZE if end of file is reached or an error occurs.
@@ -493,6 +537,29 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 
   if (inode->deny_write_cnt)
     return 0;
+
+  block_sector_t sector_idx = byte_to_sector (inode, offset);
+  if (sector_idx == (block_sector_t) -1){
+    /* Offset out of inode data */
+    off_t offset_from_inode_data = offset - bytes_to_sectors (inode_length (inode)) * BLOCK_SECTOR_SIZE;
+
+    if (offset_from_inode_data < 0) {
+      inode->data.length = offset;
+      buffer_cache_write (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
+    }
+
+    while (offset_from_inode_data >= BLOCK_SECTOR_SIZE) {
+      free_map_allocate(1, &sector_idx);
+      inode_append_sector (inode, sector_idx, BLOCK_SECTOR_SIZE); // inode_length has been updated
+      offset_from_inode_data = offset - inode_length (inode);
+    }
+
+    // The last block, containing offset
+    if (offset_from_inode_data > 0) {
+      free_map_allocate(1, &sector_idx);
+      inode_append_sector (inode, sector_idx, offset_from_inode_data);
+    } // else : offset at edge of block
+  }
 
   while (size > 0) 
     {
@@ -519,20 +586,25 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       // if (chunk_size <= 0)
       //   break;
       
+      if (!new_idx && inode_left < BLOCK_SECTOR_SIZE && size > inode_left){
       /*Growth case - last block*/
-      if (inode_left < BLOCK_SECTOR_SIZE && size > inode_left){
         if(size+sector_ofs > BLOCK_SECTOR_SIZE){
           inode->data.length = offset + sector_left;
           //size가 커서 sector_left == chunk_size
-        /*Just Length Growth*/
+          buffer_cache_write (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
         }else{
+          /*Just Length Growth*/
           inode->data.length = offset + chunk_size;
+          buffer_cache_write (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
         }
       /*Not last block*/
       }
+
       buffer_cache_write(sector_idx, buffer + bytes_written, sector_ofs, chunk_size);
-      if(new_idx){
+
+      if(new_idx) {
         /*append sector*/
+        inode_append_sector (inode, sector_idx, chunk_size);
       }
 
       /* Advance. */
