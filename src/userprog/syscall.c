@@ -3,8 +3,9 @@
 #include <string.h>
 #include <syscall-nr.h>
 #include <devices/shutdown.h>
-#include <filesys/filesys.h>
-#include <filesys/file.h>
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+#include "filesys/inode.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/malloc.h"
@@ -32,6 +33,11 @@ static void munmap(mapid_t mapid);
 static void check_pd (const void *uaddr);
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
+static bool chdir (const char *path);
+static bool mkdir (const char *path);
+static bool readdir (int fd, char *name);
+static bool isdir (int fd);
+static int inumber(int fd);
 
 struct semaphore filesys_sema;
 
@@ -190,19 +196,27 @@ syscall_handler(struct intr_frame *f) {
 
       /* Project 4 only. */
     case SYS_CHDIR:
-
+      read_argument (&(f->esp), args, 1);
+      is_valid_arg(args[0], sizeof (void *));
+      f->eax = chdir (*(char **) args[0]);
       break;
     case SYS_MKDIR:
-
+      read_argument (&(f->esp), args, 1);
+      is_valid_arg(args[0], sizeof (void *));
+      f->eax = mkdir (*(char **) args[0]);
       break;
     case SYS_READDIR:
-
+      read_argument (&(f->esp), args, 2);
+      is_valid_arg(args[1], sizeof (void *));
+      f->eax = readdir (*(int *) args[0], *(char **) args[1]);
       break;
     case SYS_ISDIR:
-
+      read_argument (&(f->esp), args, 1);
+      f->eax = isdir (*(int *) args[0]);
       break;
     case SYS_INUMBER:
-
+      read_argument (&(f->esp), args, 1);
+      f->eax = inumber (*(int *) args[0]);
       break;
     default:
 //      printf("syscall default called\n");
@@ -484,4 +498,92 @@ unpin_buffer (const void *buffer, unsigned length)
   {
     sup_page_update_frame_pinned (upage, false);
   }
+}
+
+static bool chdir (const char *path)
+{
+  sema_down (&filesys_sema);
+  struct dir* dir = dir_open_path(path);
+  if (dir != NULL) {
+    dir_close (thread_current()->cur_dir);
+    thread_current()->cur_dir = dir;
+    sema_up (&filesys_sema);
+    return true;
+  }
+  sema_up (&filesys_sema);
+  return false;
+}
+
+static bool mkdir (const char *path)
+{
+  bool result;
+  sema_down (&filesys_sema);
+  result = filesys_create (path, 0, true);
+  sema_up (&filesys_sema);
+  return result;
+}
+
+static bool readdir (int fd, char *name)
+{
+  struct file *file;
+  struct inode *inode;
+  bool is_dir;
+  struct dir *dir;
+  bool success = false;
+
+  if (strlen(name) > NAME_MAX) {
+    return false;
+  }
+
+  sema_down (&filesys_sema);
+  file = find_file (fd);
+
+  if (file != NULL){
+    inode = file_get_inode (file);
+    is_dir = inode_is_dir (inode);
+    if (is_dir) {
+      dir = dir_open (inode);
+      success = dir_readdir (dir, name);
+      dir_close (dir);
+    }
+  }
+
+  sema_up (&filesys_sema);
+  return success;
+}
+
+static bool isdir (int fd)
+{
+  struct file *file;
+  struct inode *inode;
+  bool result = false;
+
+  sema_down (&filesys_sema);
+  file = find_file (fd);
+
+  if (file != NULL){
+    inode = file_get_inode (file);
+    result = inode_is_dir (inode);
+  }
+
+  sema_up (&filesys_sema);
+  return result;
+}
+
+static int inumber(int fd)
+{
+  struct file *file;
+  struct inode *inode;
+  int result = 0;
+
+  sema_down (&filesys_sema);
+  file = find_file (fd);
+
+  if (file != NULL){
+    inode = file_get_inode (file);
+    result = inode_get_inumber (inode);
+  }
+
+  sema_up (&filesys_sema);
+  return result;
 }
