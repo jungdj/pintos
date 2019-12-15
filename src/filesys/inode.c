@@ -447,8 +447,12 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
       int chunk_size = size < min_left ? size : min_left;
       if (chunk_size <= 0)
         break;
-      
-      buffer_cache_read(sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
+
+      if (sector_idx == (block_sector_t) -2) {
+        memset (buffer+bytes_read, 0, chunk_size);
+      } else {
+        buffer_cache_read(sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
+      }
 
       /* Advance. */
       size -= chunk_size;
@@ -460,7 +464,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
 }
 
 void
-inode_append_sector (struct inode *inode, int sector_idx, off_t size)
+inode_append_sector (struct inode *inode, block_sector_t sector_idx, off_t size)
 {
   int sector_cnt = bytes_to_sectors (inode_length (inode));
   struct inode_disk *disk_inode = &inode->data;
@@ -529,15 +533,13 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     }
 
     while (offset_from_inode_data >= BLOCK_SECTOR_SIZE) {
-      free_map_allocate(1, &sector_idx);
-      inode_append_sector (inode, sector_idx, BLOCK_SECTOR_SIZE); // inode_length has been updated
+      inode_append_sector (inode, (block_sector_t) -2, BLOCK_SECTOR_SIZE); // inode_length has been updated
       offset_from_inode_data = offset - inode_length (inode);
     }
 
     // The last block, containing offset
     if (offset_from_inode_data > 0) {
-      free_map_allocate(1, &sector_idx);
-      inode_append_sector (inode, sector_idx, offset_from_inode_data);
+      inode_append_sector (inode, (block_sector_t) -2, offset_from_inode_data + 1);
     } // else : offset at edge of block
   }
 
@@ -550,6 +552,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       if (sector_idx == (block_sector_t) -1){
         free_map_allocate(1, &sector_idx);
         new_idx = true;
+      } else if (sector_idx == (block_sector_t) -2) {
+        free_map_allocate(1, &sector_idx);
       }
 
       int sector_ofs = offset % BLOCK_SECTOR_SIZE;
