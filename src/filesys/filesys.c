@@ -50,6 +50,8 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   block_sector_t inode_sector = 0;
   
   char dir_path[strlen(name)+1], file_name[strlen(name)+1];
+  memset (dir_path, 0, sizeof(dir_path));
+  memset (file_name, 0, sizeof(file_name));
   split_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(dir_path);
 
@@ -73,6 +75,8 @@ struct file *
 filesys_open (const char *name)
 {
   char dir_path[strlen(name)+1], file_name[strlen(name)+1];
+  memset (dir_path, 0, sizeof(dir_path));
+  memset (file_name, 0, sizeof(file_name));
   split_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(dir_path);
 
@@ -93,6 +97,8 @@ bool
 filesys_remove (const char *name) 
 {
   char dir_path[strlen(name)+1], file_name[strlen(name)+1];
+  memset (dir_path, 0, sizeof(dir_path));
+  memset (file_name, 0, sizeof(file_name));
   split_path(name, dir_path, file_name);
   struct dir *dir = dir_open_path(dir_path);
 
