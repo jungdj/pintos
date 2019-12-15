@@ -5,6 +5,7 @@
 #include "filesys/filesys.h"
 #include "filesys/inode.h"
 #include "threads/malloc.h"
+#include "threads/thread.h"
 
 /* A directory. */
 struct dir 
@@ -26,7 +27,7 @@ struct dir_entry
 bool
 dir_create (block_sector_t sector, size_t entry_cnt)
 {
-  return inode_create (sector, entry_cnt * sizeof (struct dir_entry));
+  return inode_create (sector, entry_cnt * sizeof (struct dir_entry), true);
 }
 
 /* Opens and returns the directory for the given INODE, of which
@@ -55,6 +56,74 @@ struct dir *
 dir_open_root (void)
 {
   return dir_open (inode_open (ROOT_DIR_SECTOR));
+}
+
+struct dir *
+dir_open_path (const char *path){
+  printf("dir_open_path start\n\n\n");
+  char copy_path[strlen(path)+1];
+  strlcpy(copy_path, path, sizeof(path));
+
+  // TODO: check . or ..
+
+  // absolute case
+  struct dir * cur_dir;
+  if(strcmp(copy_path[0], '/')){
+    cur_dir = dir_open_root(); //base setting
+  // relative case
+  }else{
+    cur_dir = dir_reopen(thread_current()->cur_dir);
+  }
+
+  char * token, save_ptr;
+  struct dir* sub_dir;
+  for(token = strtok_r(copy_path, "/", &save_ptr); token != NULL;
+    token = strtok_r(NULL, "/", &save_ptr)){
+      struct inode * cur_inode;
+      
+      if(!dir_lookup(cur_dir, token, &cur_inode)){
+        dir_close(cur_dir);
+        return NULL;
+      }else{
+        sub_dir = dir_open(cur_dir);
+        if(sub_dir==NULL){
+          dir_close(cur_dir);
+          return NULL;
+        }
+        dir_close(cur_dir);
+        cur_dir = sub_dir;
+      }
+    }
+  return cur_dir;
+}
+
+void
+split_path (const char *path, char* dir_path, char* file_path){
+  printf("split_path_start\n\n\n");
+  char copy_path[strlen(path)+1];
+  strlcpy(copy_path, path, sizeof(path));
+
+  // ASSERT(dir_path == NULL);
+  // ASSERT(file_path == NULL);
+  
+  //absoulute
+  if(strcmp(copy_path[0], '/')){
+    strlcat(dir_path, '/',sizeof('/'));
+  // relative case
+  }else{
+    ;
+  }
+
+  char* token, save_ptr, before_token;
+  for(token = strtok_r(copy_path, "/", &save_ptr); token != NULL;
+    token = strtok_r(NULL, "/", &save_ptr)){
+    if(before_token != NULL){
+      strlcat(dir_path, before_token, sizeof(before_token));
+      strlcat(dir_path, '/', sizeof('/'));
+    }
+    before_token = token;
+  }
+  strlcat(file_path, token, sizeof(token));
 }
 
 /* Opens and returns a new directory for the same inode as DIR.

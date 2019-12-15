@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include "filesys/directory.h"
 #ifdef VM
 #include "vm/page.h"
 #endif
@@ -119,7 +120,7 @@ struct thread
     struct hash *spt;
     struct list map_list;
 #endif
-
+    struct dir* cur_dir;                    /* current directory */
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

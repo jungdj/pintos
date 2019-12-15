@@ -250,7 +250,7 @@ static bool create
 {
   bool result;
   sema_down (&filesys_sema);
-  result = filesys_create (filename, initial_size);
+  result = filesys_create (filename, initial_size, false);
   sema_up (&filesys_sema);
   return result;
 }

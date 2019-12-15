@@ -11,7 +11,7 @@
 
 /* Identifies an inode. */
 #define INODE_MAGIC 0x494e4f44
-#define DIRECT_BLOCK_CNT 124
+#define DIRECT_BLOCK_CNT 123
 #define INDIRECT_BLOCK_CNT 128
 
 /* On-disk inode.
@@ -22,6 +22,7 @@ struct inode_disk
     block_sector_t indirect;                /* indirect sectors. */
     block_sector_t doubley_indirect;        /* doubly_indirect sectors. */
     off_t length;                       /* File size in bytes. */
+    bool is_dir;                        /* Check whether inode is dir or not*/
     unsigned magic;                     /* Magic number. */
     // uint32_t unused[125];
   };
@@ -128,7 +129,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, bool is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -138,13 +139,14 @@ inode_create (block_sector_t sector, off_t length)
   /* If this assertion fails, the inode structure is not exactly
      one sector in size, and you should fix that. */
   ASSERT (sizeof *disk_inode == BLOCK_SECTOR_SIZE);
-
+  printf("inode create start\n\n\n");
   disk_inode = calloc (1, sizeof *disk_inode);
   if (disk_inode != NULL)
     {
       size_t sectors = bytes_to_sectors (length);
       disk_inode->length = length;
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->is_dir = is_dir;
 
       block_sector_t allocated_sectors_cnt = 0;
       
@@ -331,6 +333,7 @@ inode_close (struct inode *inode)
       list_remove (&inode->elem);
  
       /* Deallocate blocks if removed. */
+      //TODO. dir case. Delete after check dir is empty 
       if (inode->removed) 
         {
           enum sector_status status = DIRECT;

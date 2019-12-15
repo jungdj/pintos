@@ -13,6 +13,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "filesys/directory.h"
 
 #ifdef USERPROG
 #include "userprog/process.h"
@@ -78,6 +79,10 @@ pcb_set_parent (int pid)
   struct pcb *p = find_pcb (pid);
   if (p != NULL)
     p->ppid = thread_tid ();
+    
+    //Append dir information to child thread
+    struct thread* child_thread = find_thread(pid);
+    child_thread->cur_dir = thread_current() -> cur_dir;
 }
 
 bool
