@@ -68,10 +68,14 @@ dir_open_path (const char *path){
   struct dir * cur_dir;  
   // main case
   if (copy_path[0] == '\0'){
-    return dir_open_root();
+    if (thread_current()->cur_dir != NULL) {
+      cur_dir = dir_reopen(thread_current()->cur_dir);
+    } else {
+      cur_dir = dir_open_root ();
+    }
   }
   // absolute case
-  if(copy_path[0] == '/'){
+  else if(copy_path[0] == '/'){
     cur_dir = dir_open_root(); //base setting
   // relative case
   }else{
