@@ -281,8 +281,9 @@ write (int fd, const void *buffer, unsigned size)
 
     sema_down (&filesys_sema);
     file = find_file (fd);
-
-    if (file != NULL){
+    struct inode * inode = file_get_inode (file);
+    bool is_dir = inode_is_dir (inode);
+    if (file != NULL && !is_dir){
 #ifdef VM
       check_pd (buffer);
       load_and_pin_buffer (buffer, size);
@@ -343,8 +344,9 @@ read (int fd, void *buffer, unsigned length)
   char tmp;
   sema_down (&filesys_sema);
   file = find_file(fd);
-
-  if (file != NULL){
+  struct inode * inode = file_get_inode (file);
+  bool is_dir = inode_is_dir (inode);
+  if (file != NULL && !is_dir){
 #ifdef VM
     tmp = *(char *)buffer;
     if (tmp)
