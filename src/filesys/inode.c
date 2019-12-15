@@ -449,27 +449,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset)
         break;
       
       buffer_cache_read(sector_idx, buffer + bytes_read, sector_ofs, chunk_size);
-      // if (sector_ofs == 0 && chunk_size == BLOCK_SECTOR_SIZE)
-      //   {
-      //     /* Read full sector directly into caller's buffer. */
-      //     buffer_cache_read(sector_idx, buffer + bytes_read);
-      //   }
-      // else 
-      //   {
-      //     /* Read sector into bounce buffer, then partially copy
-      //        into caller's buffer. */
-      //     if (bounce == NULL) 
-      //       {
-      //         bounce = malloc (BLOCK_SECTOR_SIZE);
-      //         if (bounce == NULL)
-      //           break;
-      //       }
-      //     buffer_cache_read(sector_idx, bounce);
-      //     memcpy (buffer + bytes_read, bounce + sector_ofs, chunk_size);
-          
-      //     // buffer_cache_read(sector_idx, buffer+bytes_read);
-      //   }
-      
+
       /* Advance. */
       size -= chunk_size;
       offset += chunk_size;
@@ -539,12 +519,12 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     return 0;
 
   block_sector_t sector_idx = byte_to_sector (inode, offset);
-  if (sector_idx == (block_sector_t) -1){
+  if (sector_idx == (block_sector_t) -1 && size>0){
     /* Offset out of inode data */
     off_t offset_from_inode_data = offset - bytes_to_sectors (inode_length (inode)) * BLOCK_SECTOR_SIZE;
 
     if (offset_from_inode_data < 0) {
-      inode->data.length = offset;
+      inode->data.length = offset+1;
       buffer_cache_write (inode->sector, &inode->data, 0, BLOCK_SECTOR_SIZE);
     }
 
@@ -577,10 +557,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
       /* Bytes left in inode, bytes left in sector, lesser of the two. */
       off_t inode_left = inode_length (inode) - offset;
       int sector_left = BLOCK_SECTOR_SIZE - sector_ofs;
-      // int min_left = inode_left < sector_left ? inode_left : sector_left;
 
       /* Number of bytes to actually write into this sector. */
-      // int chunk_size = size < min_left ? size : min_left;
       int chunk_size = size < sector_left ? size : sector_left;
       
       // if (chunk_size <= 0)
