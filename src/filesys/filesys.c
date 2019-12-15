@@ -53,6 +53,7 @@ filesys_create (const char *name, off_t initial_size, bool is_dir)
   memset (dir_path, 0, sizeof(dir_path));
   memset (file_name, 0, sizeof(file_name));
   split_path(name, dir_path, file_name);
+//  printf ("dir_path : %s, file_name : %s\n", dir_path, file_name);
   struct dir *dir = dir_open_path(dir_path);
 
   bool success = (dir != NULL

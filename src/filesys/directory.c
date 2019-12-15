@@ -116,7 +116,10 @@ split_path (const char *path, char* dir_path, char* file_path){
     before_token = token;
   }
 
+//  printf ("split_path token : %s dir_path : %s\n", before_token, dir_path);
+//  strlcat(file_path, before_token, strlen(file_path) + 1 + strlen (before_token));
   memcpy (file_path, before_token, strlen (before_token) + 1);
+//  printf ("end of split_path - file_path : %s\n", file_path);
 }
 
 /* Opens and returns a new directory for the same inode as DIR.
