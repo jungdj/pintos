@@ -77,12 +77,12 @@ void
 pcb_set_parent (int pid)
 {
   struct pcb *p = find_pcb (pid);
-  if (p != NULL)
-    p->ppid = thread_tid ();
-    
+  if (p != NULL){
+    p->ppid = thread_tid (); 
     //Append dir information to child thread
     struct thread* child_thread = find_thread(pid);
     child_thread->cur_dir = thread_current() -> cur_dir;
+  }
 }
 
 bool

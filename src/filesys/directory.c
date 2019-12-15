@@ -65,8 +65,12 @@ dir_open_path (const char *path){
 
   // TODO: check . or ..
 
+  struct dir * cur_dir;  
+  // main case
+  if (copy_path[0] == '\0'){
+    return dir_open_root();
+  }
   // absolute case
-  struct dir * cur_dir;
   if(copy_path[0] == '/'){
     cur_dir = dir_open_root(); //base setting
   // relative case
@@ -101,6 +105,9 @@ split_path (const char *path, char* dir_path, char* file_path){
   char copy_path[strlen(path)+1];
   strlcpy(copy_path, path, sizeof(copy_path));
 
+  if(strlen(path)==0){
+    return;
+  }
   //absoulute
   if(copy_path[0] == '/') {
     strlcat(dir_path, "/", strlen (dir_path) + 2);
