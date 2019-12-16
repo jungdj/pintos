@@ -133,7 +133,9 @@ sema_up (struct semaphore *sema)
     thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
     /* Sema's max_priority is updated to the priority of next
        waiter with highest priority */
+    int prev = sema->max_priority;
     sema->max_priority = list_entry (list_begin (&sema->waiters), struct thread, elem)->effective_priority;
+    if (prev > thread_current()->priority) thread_yield ();
   } else {
     /* No waiters left for the sema */
     sema->max_priority = 0;
