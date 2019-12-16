@@ -298,23 +298,20 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
-
-  if(inode_is_dir(inode)){
+  if(inode_is_dir(inode)) {
     /*Do not erase if name file == non-empty-dir*/
-    struct dir* erased_dir = dir_open(inode);
-    if (!dir_is_empty(erased_dir)){
+    struct dir *erased_dir = dir_open(inode);
+    if (!dir_is_empty(erased_dir)) {
       goto done;
     }
     /*Do not erase self*/
-    struct dir * cur_dir = thread_current()->cur_dir;
-    if(inode_get_inumber(dir_get_inode(cur_dir)) == inode_get_inumber(inode)){
+    struct dir *cur_dir = thread_current()->cur_dir;
+    if (inode_get_inumber(dir_get_inode(cur_dir)) == inode_get_inumber(inode)) {
       goto done;
     }
-  }
-
-//  if (inode 가 open 인지 체크?)
-  if (inode_get_open_cnt(inode) > 1) {
-    goto done;
+    if (inode_get_open_cnt(inode) > 1) {
+      goto done;
+    }
   }
 
   /* Erase directory entry. */
