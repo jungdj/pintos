@@ -420,10 +420,10 @@ close (int fd)
   struct file_descriptor *fd_info = find_fd (fd);
   if (fd_info != NULL) {
     list_remove (&fd_info->elem);
-    file_close (fd_info->file);
     if (fd_info->dir) {
-      dir_close (fd_info->dir);
+      free (fd_info->dir);
     }
+    file_close (fd_info->file);
     free (fd_info);
   }
   sema_up (&filesys_sema);
