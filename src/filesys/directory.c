@@ -349,7 +349,7 @@ dir_is_empty(struct dir * dir){
   //loop check except first entry(about ..)
   for (ofs = sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e){
-    if (e.in_use && !strcmp (e.name, ".."))
+    if (e.in_use || !strcmp (e.name, ".."))
       return false;
     }
   return true;
