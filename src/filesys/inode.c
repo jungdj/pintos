@@ -491,6 +491,12 @@ inode_append_sector (struct inode *inode, block_sector_t sector_idx, off_t size)
   if (sector_cnt < DIRECT_BLOCK_CNT) {
     disk_inode->direct[sector_cnt] = sector_idx;
   } else if (sector_cnt < DIRECT_BLOCK_CNT + INDIRECT_BLOCK_CNT) {
+    if (sector_cnt == DIRECT_BLOCK_CNT){
+      block_sector_t indirect_idx;
+      free_map_allocate(1, &indirect_idx);
+      disk_inode->indirect=indirect_idx;
+      buffer_cache_write(inode->sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+    }
     indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
     buffer_cache_read (disk_inode->indirect, indirect_inode, 0, BLOCK_SECTOR_SIZE);
     indirect_inode->indirect[sector_cnt - DIRECT_BLOCK_CNT] = sector_idx;
@@ -498,6 +504,13 @@ inode_append_sector (struct inode *inode, block_sector_t sector_idx, off_t size)
     free (indirect_inode);
   } else {
     /* Doubly Indirect */
+    if (sector_cnt == DIRECT_BLOCK_CNT+INDIRECT_BLOCK_CNT){
+      block_sector_t doubly_indirect_idx;
+      free_map_allocate(1, &doubly_indirect_idx);
+      disk_inode->doubley_indirect=doubly_indirect_idx;
+      buffer_cache_write(inode->sector, disk_inode, 0, BLOCK_SECTOR_SIZE);
+    }
+
     doubly_indirect_inode = (struct inode_for_indirect *)calloc(1, sizeof(struct inode_for_indirect));
     buffer_cache_read (disk_inode->doubley_indirect, doubly_indirect_inode, 0, BLOCK_SECTOR_SIZE);
     int idx_in_doubly = (sector_cnt - DIRECT_BLOCK_CNT - INDIRECT_BLOCK_CNT) / INDIRECT_BLOCK_CNT;
