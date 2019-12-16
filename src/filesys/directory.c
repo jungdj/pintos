@@ -201,10 +201,14 @@ dir_lookup (const struct dir *dir, const char *name,
   ASSERT (dir != NULL);
   ASSERT (name != NULL);
 
-  if (lookup (dir, name, &e, NULL))
+  if (lookup (dir, name, &e, NULL)){
     *inode = inode_open (e.inode_sector);
-  else
+  }else if(!strcmp(name, ".")){
+    *inode = inode_open (inode_get_inumber(dir_get_inode(dir)));
+  }
+  else{
     *inode = NULL;
+  }
 
   return *inode != NULL;
 }
@@ -241,7 +245,7 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector, bool is
     e.in_use=true;
     strlcpy(e.name, "..", sizeof e.name);
     //Not sure if this can be done
-    e.inode_sector = dir_get_inode(dir);
+    e.inode_sector = inode_get_inumber(dir_get_inode(dir));
     
     if(inode_write_at(inode_child, &e, sizeof e, ofs) != sizeof e){
       inode_close(inode_child);
@@ -298,6 +302,8 @@ dir_remove (struct dir *dir, const char *name)
   if(inode_is_dir(inode)){
     /*Do not erase if name file == non-empty-dir*/
     if (!dir_is_empty(dir)){
+    struct dir* erased_dir = dir_open(inode);
+    if (!dir_is_empty(erased_dir)){
       goto done;
     }
     /*Do not erase self*/
@@ -347,10 +353,14 @@ dir_is_empty(struct dir * dir){
   off_t ofs;
   
   //loop check except first entry(about ..)
-  for (ofs = sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+  for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
        ofs += sizeof e){
-    if (e.in_use || !strcmp (e.name, ".."))
-      return false;
+    // printf("name : %s \n\n", e.name);
+    if(!strcmp (e.name, "..")){
+      continue;
     }
+    if (e.in_use)
+      return false;
+  }
   return true;
 }
