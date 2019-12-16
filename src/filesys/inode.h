@@ -11,6 +11,7 @@ void inode_init (void);
 bool inode_create (block_sector_t, off_t, bool);
 struct inode *inode_open (block_sector_t);
 struct inode *inode_reopen (struct inode *);
+int inode_get_open_cnt (struct inode *inode);
 block_sector_t inode_get_inumber (const struct inode *);
 bool inode_is_dir (struct inode *);
 void inode_close (struct inode *);
