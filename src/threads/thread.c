@@ -47,7 +47,6 @@ struct thread* find_thread (int tid)
 }
 
 
-
 struct list pcbs;
 
 struct pcb* find_pcb (int pid)
@@ -167,6 +166,17 @@ find_file (int fd)
     return fd_info->file;
   }
 
+  return NULL;
+}
+
+struct dir *
+fd_open_dir (int fd)
+{
+  struct file_descriptor *file_info = find_fd (fd);
+
+  if (file_info != NULL) {
+    return file_info->dir;
+  }
   return NULL;
 }
 

@@ -316,6 +316,8 @@ open (const char *file_name)
   struct file_descriptor *fd;
   struct file *file = NULL;
   int result = -1;
+  struct inode *inode;
+  struct dir *dir;
 
   fd = (struct file_descriptor *) malloc (sizeof (struct file_descriptor));
   memset (fd, 0, sizeof (struct file_descriptor));
@@ -325,6 +327,12 @@ open (const char *file_name)
   file = filesys_open (file_name);
   if (file != NULL)
   {
+    inode = file_get_inode (file);
+    if (inode_is_dir (inode)) {
+      dir = dir_open (inode);
+      fd->dir = dir;
+    }
+
     fd->file = file;
     fd->fd = ++(t->cur_fd);
 
@@ -413,6 +421,9 @@ close (int fd)
   if (fd_info != NULL) {
     list_remove (&fd_info->elem);
     file_close (fd_info->file);
+    if (fd_info->dir) {
+      dir_close (fd_info->dir);
+    }
     free (fd_info);
   }
   sema_up (&filesys_sema);
@@ -538,16 +549,11 @@ static bool readdir (int fd, char *name)
   }
 
   sema_down (&filesys_sema);
-  file = find_file (fd);
 
-  if (file != NULL){
-    inode = file_get_inode (file);
-    is_dir = inode_is_dir (inode);
-    if (is_dir) {
-      dir = dir_open (inode);
-      success = dir_readdir (dir, name);
-      dir_close (dir);
-    }
+  dir = fd_open_dir (fd);
+
+  if (dir != NULL){
+    success = dir_readdir (dir, name);
   }
 
   sema_up (&filesys_sema);

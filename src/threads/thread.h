@@ -31,6 +31,7 @@ typedef int tid_t;
 
 struct file_descriptor {
     int fd;
+    struct dir* dir;
     struct file *file;
     struct list_elem elem;
 };
@@ -164,6 +165,7 @@ extern bool thread_mlfqs;
 struct thread* find_thread (int tid);
 struct file_descriptor * find_fd (int fd);
 struct file * find_file (int fd);
+struct dir * fd_open_dir (int fd);
 
 struct map_desc * find_map_desc (mapid_t fd);
 
