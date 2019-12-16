@@ -28,17 +28,20 @@ static int write (int fd, const void *buffer, unsigned size);
 static void seek (int fd, unsigned position);
 static unsigned tell (int fd);
 static void close (int fd);
+#ifdef VM
 static mapid_t mmap (int fd, void* upage);
 static void munmap(mapid_t mapid);
 static void check_pd (const void *uaddr);
 void load_and_pin_buffer (const void *buffer, unsigned length);
 void unpin_buffer (const void *buffer, unsigned length);
+#endif
+#ifdef FILESYS
 static bool chdir (const char *path);
 static bool mkdir (const char *path);
 static bool readdir (int fd, char *name);
 static bool isdir (int fd);
 static int inumber(int fd);
-
+#endif
 struct semaphore filesys_sema;
 
 int global_mapid=1;
@@ -182,6 +185,7 @@ syscall_handler(struct intr_frame *f) {
       read_argument (&(f->esp), args, 1);
       close (*(int *) args[0]);
       break;
+#ifdef VM
       /* Project 3 and optionally project 4. */
     case SYS_MMAP:
 //      printf ("syscall MMAP called\n");
@@ -193,7 +197,9 @@ syscall_handler(struct intr_frame *f) {
       read_argument (&(f->esp), args, 1);
       munmap(*(mapid_t*) args[0]);
       break;
+#endif
 
+#ifdef FILESYS
       /* Project 4 only. */
     case SYS_CHDIR:
       read_argument (&(f->esp), args, 1);
@@ -218,6 +224,7 @@ syscall_handler(struct intr_frame *f) {
       read_argument (&(f->esp), args, 1);
       f->eax = inumber (*(int *) args[0]);
       break;
+#endif
     default:
 //      printf("syscall default called\n");
       break;
@@ -430,7 +437,7 @@ close (int fd)
   }
   sema_up (&filesys_sema);
 }
-
+#ifdef VM
 static mapid_t 
 mmap (int fd, void* upage)
 {
@@ -514,7 +521,8 @@ unpin_buffer (const void *buffer, unsigned length)
     sup_page_update_frame_pinned (upage, false);
   }
 }
-
+#endif
+#ifdef FILESYS
 static bool chdir (const char *path)
 {
   sema_down (&filesys_sema);
@@ -597,3 +605,4 @@ static int inumber(int fd)
   sema_up (&filesys_sema);
   return result;
 }
+#endif
