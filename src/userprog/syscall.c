@@ -362,6 +362,7 @@ read (int fd, void *buffer, unsigned length)
   file = find_file(fd);
   struct inode * inode = file_get_inode (file);
   bool is_dir = inode_is_dir (inode);
+  sema_down (&filesys_sema);
   if (file != NULL && !is_dir){
 #ifdef VM
     tmp = *(char *)buffer;
@@ -373,14 +374,13 @@ read (int fd, void *buffer, unsigned length)
       load_and_pin_buffer (buffer, length);
     }
 #endif
-    sema_down (&filesys_sema);
     result = file_read (file, buffer, length);
-    sema_up (&filesys_sema);
 #ifdef VM
     unpin_buffer (buffer, length);
 #endif
   }
 
+  sema_up (&filesys_sema);
   return result;
 }
 
