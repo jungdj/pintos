@@ -134,12 +134,10 @@ sema_up (struct semaphore *sema)
     /* Sema's max_priority is updated to the priority of next
        waiter with highest priority */
     sema->max_priority = list_entry (list_begin (&sema->waiters), struct thread, elem)->effective_priority;
-    thread_yield ();
   } else {
     /* No waiters left for the sema */
     sema->max_priority = 0;
   }
-
   intr_set_level (old_level);
 }
 
