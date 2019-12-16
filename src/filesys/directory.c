@@ -301,7 +301,6 @@ dir_remove (struct dir *dir, const char *name)
 
   if(inode_is_dir(inode)){
     /*Do not erase if name file == non-empty-dir*/
-    if (!dir_is_empty(dir)){
     struct dir* erased_dir = dir_open(inode);
     if (!dir_is_empty(erased_dir)){
       goto done;
