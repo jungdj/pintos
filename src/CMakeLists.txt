@@ -40,6 +40,7 @@ set(SOURCE_FILES threads/thread.c
         vm/page.c
         vm/swap.c
         filesys/filesys.c
+        filesys/free-map.c
         filesys/file.c
         filesys/inode.c
         filesys/cache.c
