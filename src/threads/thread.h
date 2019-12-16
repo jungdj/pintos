@@ -101,7 +101,10 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     int exit_status;
-
+    int effective_priority;             /* Effective Priority . */
+    struct list locks;                  /* List of locks */
+    struct lock *lock_needed;            /* Lock failed to acquire */
+    int64_t awake_from;                 /* Awake from . */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -178,6 +181,12 @@ void thread_print_stats (void);
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
+//static bool sleep_less (const struct list_elem *a_, const struct list_elem *_b, void *aux UNUSED);
+//static bool priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+//static bool e_priority_less (const struct list_elem *a_, const struct list_elem *b_, void *aux UNUSED);
+
+void thread_sleep (int64_t ticks);
+void thread_wake (void);
 void thread_block (void);
 void thread_unblock (struct thread *);
 

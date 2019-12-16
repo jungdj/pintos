@@ -1,3 +1,4 @@
+#include "devices/timer.h"
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -28,6 +29,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list sleep_list;
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -314,6 +317,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list);
   list_init (&all_list);
   list_init (&pcbs);
 
@@ -357,10 +361,12 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
-    intr_yield_on_return ();
+  if (++thread_ticks >= TIME_SLICE) {
+      intr_yield_on_return();
+  }
+
+  thread_wake ();
 }
 
 /* Prints thread statistics. */
@@ -434,9 +440,65 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  thread_yield();
+  if (t->priority > thread_current ()->effective_priority) {
+      thread_yield ();
+  }
 
   return tid;
+}
+
+static bool
+sleep_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED)
+{
+    const struct thread *a = list_entry (a_, struct thread, elem);
+    const struct thread *b = list_entry (b_, struct thread, elem);
+
+    return a->awake_from < b->awake_from;
+}
+
+static bool
+e_priority_less (const struct list_elem *a_, const struct list_elem *b_,
+                 void *aux UNUSED)
+{
+    const struct thread *a = list_entry (a_, struct thread, elem);
+    const struct thread *b = list_entry (b_, struct thread, elem);
+    return a->effective_priority > b->effective_priority;
+}
+
+void
+thread_sleep (int64_t ticks)
+{
+    enum intr_level old_level;
+    old_level = intr_disable ();
+
+    struct thread *cur = thread_current ();
+    ASSERT(cur != idle_thread);
+
+    cur->awake_from = ticks;
+
+    list_insert_ordered (&sleep_list, &cur->elem, sleep_less, NULL);
+    thread_block();
+
+    intr_set_level (old_level);
+}
+
+void
+thread_wake (void)
+{
+    int64_t ticks = timer_ticks ();
+    struct list_elem *e = list_begin (&sleep_list);
+    
+    while (e != list_end (&sleep_list)) {
+        struct thread *t = list_entry (e, struct thread, elem);
+        if (ticks >= t->awake_from) {
+            e = e->next;
+            list_pop_front (&sleep_list);
+            thread_unblock (t);
+        } else {
+            break;
+        }
+    }
 }
 
 /* Puts the current thread to sleep.  It will not be scheduled
@@ -545,8 +607,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread)
+      list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -573,14 +635,40 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  int prev_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
+
+  struct thread *cur = thread_current ();
+  struct list *locks = &cur->locks;
+
+  // 락이 있으면 lock list의 semaphore max priority로
+  if (!list_empty (&cur->locks)) {
+    int max_priority = new_priority;
+    struct list_elem *e;
+    for (e = list_begin (locks); e != list_end (locks); e=e->next) {
+      struct lock *lock = list_entry (e, struct lock, elem);
+      struct semaphore *sema = &lock->semaphore;
+      if (max_priority < sema->max_priority) max_priority = sema->max_priority;
+    }
+    cur->effective_priority = max_priority;
+
+    // 끝나고 yield
+    thread_yield ();
+  } else {
+    // 락이 없으면 무조건 변경
+    cur->effective_priority = new_priority;
+    // Priority 가 낮아지면 yield
+    if (prev_priority > new_priority) {
+      thread_yield ();
+    }
+  }
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  return thread_current ()->effective_priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -707,7 +795,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->cur_fd = 2;
 
   t->exit_status = -1;
+  t->effective_priority = priority;
+  t->awake_from = 0;
   t->magic = THREAD_MAGIC;
+  t->lock_needed = NULL;
+  list_init (&t->locks);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -738,6 +830,7 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
+    list_sort (&ready_list, e_priority_less, NULL);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
