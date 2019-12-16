@@ -129,7 +129,8 @@ split_path (const char *path, char* dir_path, char* file_path){
 
 //  printf ("split_path token : %s dir_path : %s\n", before_token, dir_path);
 //  strlcat(file_path, before_token, strlen(file_path) + 1 + strlen (before_token));
-  memcpy (file_path, before_token, strlen (before_token) + 1);
+  if (before_token != NULL)
+    memcpy (file_path, before_token, strlen (before_token) + 1);
 //  printf ("end of split_path - file_path : %s\n", file_path);
 }
 
@@ -232,6 +233,22 @@ dir_add (struct dir *dir, const char *name, block_sector_t inode_sector)
   if (lookup (dir, name, NULL, NULL))
     goto done;
 
+  /*if we add dir, we give first entry about parent for child directory*/
+  if (is_dir){
+    struct inode * inode_child;
+    inode_child = inode_open(inode_sector);
+    
+    e.in_use=true;
+    strlcpy(e.name, "..", sizeof e.name);
+    //Not sure if this can be done
+    e.inode_sector = dir_get_inode(dir);
+    
+    if(inode_write_at(inode_child, &e, sizeof e, ofs) != sizeof e){
+      inode_close(inode_child);
+      goto done;
+    }
+    inode_close(inode_child);
+  }
   /* Set OFS to offset of free slot.
      If there are no free slots, then it will be set to the
      current end-of-file.
@@ -277,6 +294,19 @@ dir_remove (struct dir *dir, const char *name)
   if (inode == NULL)
     goto done;
 
+
+  if(inode_is_dir(inode)){
+    /*Do not erase if name file == non-empty-dir*/
+    if (!dir_is_empty){
+      goto done;
+    }
+    /*Do not erase self*/
+    struct dir * cur_dir = thread_current()->cur_dir;
+    if(inode_get_inumber(dir_get_inode(cur_dir)) == inode_get_inumber(inode)){
+      goto done;
+    }
+  }
+
   /* Erase directory entry. */
   e.in_use = false;
   if (inode_write_at (dir->inode, &e, sizeof e, ofs) != sizeof e) 
@@ -309,4 +339,18 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1])
         } 
     }
   return false;
+}
+
+bool
+dir_is_empty(struct dir * dir){
+  struct dir_entry e;
+  off_t ofs;
+  
+  //loop check except first entry(about ..)
+  for (ofs = sizeof e; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+       ofs += sizeof e){
+    if (e.in_use)
+      return false;
+    }
+  return true;
 }
