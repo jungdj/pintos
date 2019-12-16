@@ -325,11 +325,11 @@ open (const char *file_name)
   int result = -1;
   struct inode *inode;
   struct dir *dir;
+  sema_down (&filesys_sema);
 
   fd = (struct file_descriptor *) malloc (sizeof (struct file_descriptor));
   memset (fd, 0, sizeof (struct file_descriptor));
 
-  sema_down (&filesys_sema);
 
   file = filesys_open (file_name);
   if (file != NULL)
