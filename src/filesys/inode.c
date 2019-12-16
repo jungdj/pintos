@@ -423,6 +423,7 @@ inode_close (struct inode *inode)
           for(int i=0; i<INDIRECT_BLOCK_CNT; i++){
             free (indirect_for_doubly[i]);
           }
+          free_map_release(inode->sector, 1);
         }
       free (inode); 
     }

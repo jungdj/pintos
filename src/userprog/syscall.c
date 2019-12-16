@@ -329,7 +329,7 @@ open (const char *file_name)
   {
     inode = file_get_inode (file);
     if (inode_is_dir (inode)) {
-      dir = dir_open (inode);
+      dir = dir_open (inode_reopen(inode));
       fd->dir = dir;
     }
 
@@ -338,6 +338,8 @@ open (const char *file_name)
 
     list_push_back (&t->fds, &fd->elem);
     result = fd->fd;
+  }else{
+    free(fd);
   }
 
   sema_up (&filesys_sema);
@@ -421,7 +423,7 @@ close (int fd)
   if (fd_info != NULL) {
     list_remove (&fd_info->elem);
     if (fd_info->dir) {
-      free (fd_info->dir);
+      dir_close (fd_info->dir);
     }
     file_close (fd_info->file);
     free (fd_info);
