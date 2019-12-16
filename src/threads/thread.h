@@ -148,6 +148,7 @@ struct pcb {
     struct list_elem elem;
 };
 
+#ifdef USERPROG
 struct pcb* find_pcb (int pid);
 struct pcb* find_child_pcb (int pid);
 void pcb_set_parent (int pid);
@@ -157,8 +158,14 @@ void pcb_update_status (int status);
 void pcb_wait_sema_up (void);
 void pcb_p_loaded_sema_up (void);
 void free_pcb (int pid);
+struct file * find_file (int fd);
+struct file_descriptor * find_fd (int fd);
+#endif
+#ifdef VM
 void free_mmap_all(void);
 bool free_mmap_one(mapid_t mapid);
+struct map_desc * find_map_desc (mapid_t fd);
+#endif
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
@@ -166,11 +173,9 @@ bool free_mmap_one(mapid_t mapid);
 extern bool thread_mlfqs;
 
 struct thread* find_thread (int tid);
-struct file_descriptor * find_fd (int fd);
-struct file * find_file (int fd);
+#ifdef FILESYS
 struct dir * fd_open_dir (int fd);
-
-struct map_desc * find_map_desc (mapid_t fd);
+#endif
 
 void thread_init (void);
 void thread_start (void);

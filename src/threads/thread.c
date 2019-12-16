@@ -50,6 +50,7 @@ struct thread* find_thread (int tid)
 }
 
 
+#ifdef USERPROG
 struct list pcbs;
 
 struct pcb* find_pcb (int pid)
@@ -137,7 +138,6 @@ free_pcb (int pid)
 }
 
 
-
 struct file_descriptor *
 find_fd (int fd)
 {
@@ -199,7 +199,8 @@ free_fds (void)
   }
   sema_up_filesys ();
 }
-
+#endif
+#ifdef VM
 void
 free_mmap_all(void)
 {
@@ -253,6 +254,7 @@ find_map_desc (mapid_t mapid)
   }
   return NULL;
 }
+#endif
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -319,7 +321,9 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&sleep_list);
   list_init (&all_list);
+#ifdef USERPROG
   list_init (&pcbs);
+#endif
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -413,6 +417,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+#ifdef USERPROG
   /* PCB malloc */
   struct pcb *new_pcb = (struct pcb *) malloc (sizeof (struct pcb));
   new_pcb->pid = t->tid;
@@ -421,6 +426,7 @@ thread_create (const char *name, int priority,
   sema_init (&new_pcb->wait_sema, 0);
   sema_init (&new_pcb->process_loaded_sema, 0);
   list_push_back (&pcbs, &new_pcb->elem);
+#endif
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -583,12 +589,12 @@ thread_exit (void)
   
 #ifdef USERPROG
   process_exit ();
+  free_fds ();
 #endif
 
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
-  free_fds ();
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
