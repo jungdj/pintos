@@ -84,7 +84,7 @@ filesys_open (const char *name)
   struct inode *inode = NULL;
 
   if (dir != NULL) {
-    if (!strlen(file_name))
+    if (strlen(dir_path) && !strlen(file_name))
       inode = inode_open (ROOT_DIR_SECTOR);
     else
       dir_lookup (dir, file_name, &inode);
